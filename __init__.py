@@ -1,0 +1,1020 @@
+from __future__ import division
+import itertools
+import copy
+import numpy
+import sys
+import cProfile
+import copy
+from scipy import sparse
+
+use_sage=True
+if use_sage:
+    from sage.all import *
+
+    gap.load_package("Cryst")
+else:
+    ZZ = None
+
+import cython_fns
+
+def powerset(iterable):
+    "powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"
+    s = list(iterable)
+    return itertools.chain.from_iterable(itertools.combinations(s, r) for r in range(len(s)+1))
+
+class PointInUniverse(object):
+    def __init__(self, universe, *coords):
+        self.universe = universe
+        self.coords = copy(vector(QQ, universe.canonicalize_coords(coords)))
+        self.coords.set_immutable()
+
+        self.original_coords = tuple(self.coords)
+        self.original_hash = None
+        self.original_hash = hash(self)
+
+    def __hash__(self):
+        h = hash(self.coords)
+        if self.original_hash is not None and h != self.original_hash:
+            raise RuntimeError, "PointInUniverse: hash changed: " 
+        return h
+
+    def __eq__(x,y):
+        return x.coords == y.coords
+
+    def __gt__(x,y):
+        return x.coords > y.coords
+
+    def __ge__(x,y):
+        return x.coords >= y.coords
+
+    def __lt__(x,y):
+        return x.coords < y.coords
+
+    def __le__(x,y):
+        return x.coords <= y.coords
+
+    def __ne__(x,y):
+        return x.coords != y.coords
+
+    def __str__(self):
+        return str(self.coords)
+
+    def __repr__(self):
+        return str(self)
+
+    def __len__(self):
+        return len(self.coords)
+
+    def act_with(self, action):
+        if isinstance(action, MatrixQuotientGroupElement):
+            action = action.as_matrix_representative()
+
+        v = vector(tuple(self.coords) + (1,))
+        vout = action*v
+        ret = PointInUniverse(self.universe, *(vout[:-1]))
+
+        return ret
+
+class Universe(object):
+    def cell_on_boundary(self, cell):
+        return all(not self.point_in_interior(pt) for pt in cell)
+
+def fracpart(x):
+    return x-floor(x)
+
+class OpenToroidalUniverse(Universe):
+    def __init__(self, extents, open_dirs):
+        self.extents = extents
+        self.open_dirs = open_dirs
+
+    def canonicalize_coords(self, coords):
+        coords = list(QQ(c) for c in coords)
+        for i in xrange(len(self.extents)):
+            if i not in self.open_dirs:
+                coords[i] = (fracpart((coords[i]-self.extents[i][0]) / (self.extents[i][1] - self.extents[i][0]))
+                        * (self.extents[i][1] - self.extents[i][0])
+                        + self.extents[i][0])
+        return coords
+
+    def point_in_interior(self, point):
+        for d in xrange(len(self.extents)):
+            if d in self.open_dirs:
+                if point.coords[d] <= self.extents[d][0] or point.coords[d] >= self.extents[d][1]:
+                    return False
+        return True
+
+class FormalIntegerSum(object):
+    def __init__(self,coeffs={}):
+        if not isinstance(coeffs,dict):
+            self.coeffs = { coeffs : 1 }
+        else:
+            self.coeffs = copy(coeffs)
+
+    def __add__(a,b):
+        ret = FormalIntegerSum(a.coeffs)
+        for o,coeff in b.coeffs.iteritems():
+            if o in ret.coeffs:
+                ret.coeffs[o] += coeff
+            else:
+                ret.coeffs[o] = coeff
+        return ret
+
+    def __iter__(self):
+        return self.coeffs.iteritems()
+
+    def act_with(self,action):
+        ret = FormalIntegerSum({})
+        for o,coeff in self.coeffs.iteritems():
+            ret[o.act_with(action)] = coeff
+        return ret
+
+    def __str__(self):
+        if len(self.coeffs) == 0:
+            return "0"
+        else:
+            s = ""
+            items = self.coeffs.items()
+            for i in xrange(len(items)):
+                s += str(items[i][1]) + "*" + str(items[i][0])
+                if i < len(items)-1:
+                    s += " + "
+            return s
+
+    def __repr__(self):
+        return str(self)
+
+class ConvexHullCell(object):
+    def __init__(self,points,orientation):
+        # The orientation is an anti-symmetric matrix implementing the
+        # projected determinant.
+        self.points = frozenset(points)
+        self._orientation = orientation
+        self.original_my_hash = None
+        self.original_my_hash = ConvexHullCell.__hash__(self)
+
+    def act_with(self,action):
+        ret = ConvexHullCell([p.act_with(action) for p in list(self)],
+                orientation=transform_levi_civita(self._orientation,action))
+
+        return ret
+
+    def __eq__(a,b):
+        return a.points == b.points
+
+    def __hash__(self):
+        h = hash(self.points)
+        if self.original_my_hash is not None and h != self.original_my_hash:
+            raise RuntimeError, "ConvexHullCell: hash changed"
+        return h
+
+    def __iter__(self):
+        return iter(self.points)
+
+    def __str__(self):
+        return "CELL" + str(list(self.points))
+
+    def __repr__(self):
+        return str(self)
+
+    def orientation(self):
+        return self._orientation
+
+class ConvexHullCellWithMidpoint(ConvexHullCell):
+    def __init__(self, points, orientation, midpoint):
+        super(ConvexHullCellWithMidpoint,self).__init__(points,orientation)
+        self.midpoint = midpoint
+
+    def act_with(self,action):
+        pt = super(ConvexHullCellWithMidpoint,self).act_with(action)
+        return ConvexHullCellWithMidpoint(pt.points, pt.orientation(),
+                self.midpoint.act_with(action))
+
+    def forget_midpoint(self):
+        return ConvexHullCell(self.points,self.orientation)
+
+    def __hash__(self):
+        return super(ConvexHullCellWithMidpoint,self).__hash__() ^ hash(self.midpoint)
+
+    def __eq__(self,b):
+        return super(ConvexHullCellWithMidpoint,self).__eq__(b) and self.midpoint == b.midpoint
+
+    def __ne__(a,b):
+        return not a == b
+
+    def __str__(self):
+        return "MIDP" + super(ConvexHullCellWithMidpoint,self).__str__() + ";" + str(self.midpoint)
+
+    def __repr__(self):
+        return str(self)
+
+
+def cubical_cell(ndims, basepoint_coords, direction, universe, with_midpoint=False):
+    assert len(direction) == ndims
+
+    basepoint_coords = numpy.array(basepoint_coords)
+    points = []
+    for increment_dirs in powerset(direction):
+        coord = numpy.copy(basepoint_coords)
+        for d in increment_dirs:
+            coord[d] += 1
+        points += [ coord ]
+
+    orientation = projected_levi_civita(len(basepoint_coords),direction)
+
+    midpoint = vector(QQ, sum(coord for coord in points))/len(points)
+    midpoint = PointInUniverse(universe, *midpoint)
+
+    points = [ PointInUniverse(universe, *coord) for coord in points ]
+
+    if with_midpoint:
+        return ConvexHullCellWithMidpoint(points, orientation, midpoint)
+    else:
+        return ConvexHullCell(points, orientation)
+
+
+#def cubical_cell_boundary(ndims, basepoint, direction,
+#        open_directions_forward=None, open_directions_backward=None):
+#
+#    if open_directions_forward is None:
+#        open_directions_forward = []
+#
+#    if open_directions_backward is None:
+#        open_directions_backward = []
+#
+#    coeffs = {}
+#    for face_direction in direction:
+#        remaining_directions = [ d for d in direction if d != face_direction ]
+#
+#        if face_direction not in open_directions_backward:
+#            coeffs[cubical_cell(ndims-1, basepoint, remaining_directions)] = -1
+#
+#        if face_direction not in open_directions_forward:
+#            coord = list(basepoint.coords)
+#            coord[face_direction] += 1
+#            coeffs[cubical_cell(ndims-1, Point(*coord), remaining_directions)] = 1
+#
+#    return FormalIntegerSum(coeffs)
+#
+
+def projected_levi_civita(ndims_universe, directions):
+    E = numpy.zeros(shape=(ndims_universe,)*len(directions), dtype=int)
+
+    directions = sorted(directions)
+    for permuted_directions in itertools.permutations(directions):
+        s,parity = selection_sort_with_parity(permuted_directions)
+        assert tuple(s) == tuple(directions)
+
+        E[permuted_directions] = parity
+
+    return E
+
+def selection_sort_with_parity(l):
+    l = list(l)
+    parity = 1
+    for i in xrange(len(l)):
+        index_smallest=i
+        for j in xrange(i+1,len(l)):
+            if l[j] < l[index_smallest]:
+                index_smallest = j
+            elif l[j] == l[index_smallest]:
+                raise ValueError, "Two elements of list are identical."
+        if index_smallest != i:
+            l[i], l[index_smallest] = l[index_smallest], l[i]
+            parity *= -1
+    return l,parity
+
+def reduce_projected_levi_civita(E, normal_vector):
+    return numpy.tensordot(E, normal_vector, (0,0))
+
+def transform_levi_civita(E, R):
+    if isinstance(R,MatrixQuotientGroupElement):
+        R = R.as_matrix_representative()
+    Rt = numpy.transpose(R.numpy())[0:-1,0:-1]
+    for i in xrange(len(E.shape)):
+        E = numpy.tensordot(E, Rt, (0,0))
+    return E
+
+def get_relative_orientation(orientation1, orientation2):
+    if numpy.array_equal(orientation1,orientation2):
+        return 1
+    elif numpy.array_equal(orientation1,-orientation2):
+        return -1
+    else:
+        raise RuntimeError, "Orientations are not relative."
+
+def cubical_cell_boundary(ndims, basepoint_coords, direction, orientation,
+        universe, with_midpoints=False):
+    coeffs = {}
+    for face_direction in direction:
+        normal_vector = numpy.zeros(shape=(len(basepoint_coords),),dtype=int)
+        normal_vector[face_direction] = 1
+        remaining_directions = [ d for d in direction if d != face_direction ]
+
+        cell = cubical_cell(ndims-1, basepoint_coords, remaining_directions,
+                universe, with_midpoint=with_midpoints)
+        if not universe.cell_on_boundary(cell):
+            reduced_orientation = reduce_projected_levi_civita(orientation, normal_vector)
+            coeffs[cell] = get_relative_orientation(reduced_orientation,
+                    cell.orientation())
+
+        coord = numpy.array(basepoint_coords)
+        coord[face_direction] += 1
+        cell = cubical_cell(ndims-1, coord, remaining_directions, universe,
+                with_midpoint=with_midpoints)
+        if not universe.cell_on_boundary(cell):
+            reduced_orientation = reduce_projected_levi_civita(orientation, -normal_vector)
+            coeffs[cell] = get_relative_orientation(reduced_orientation,
+                    cell.orientation())
+
+    return FormalIntegerSum(coeffs)
+
+def _cubical_complex_base(ndims, extents, universe, with_midpoints=False):
+    cplx = ConvexComplex(ndims)
+    for celldim in xrange(ndims+1):
+        for direction in itertools.combinations(xrange(ndims),celldim):
+            coord_ranges = [ xrange(*extents[i])  for i in xrange(ndims) ]
+            for coord in itertools.product(*coord_ranges):
+                cell = cubical_cell(celldim,coord,direction,
+                        universe, with_midpoint=with_midpoints)
+                if not universe.cell_on_boundary(cell):
+                    cplx.add_cell(celldim,
+                            cell,
+                            cubical_cell_boundary(celldim,coord,direction,
+                                cell.orientation(), universe,
+                                with_midpoints=with_midpoints)
+                            )
+    return cplx
+
+def cubical_complex(ndims, sizes, open_dirs, with_midpoints=False):
+    assert len(sizes) == ndims
+    assert all(d >= 0 and d < ndims for d in open_dirs)
+
+    for d in xrange(ndims):
+        if sizes[d] <= 1 and not d in open_dirs and not with_midpoints:
+            raise ValueError, "Don't use this function to construct a compactified direction of length <= 2 without setting with_midpoints=True, this causes problems."
+
+    extents = [ [-sizes[i],sizes[i]] for i in xrange(ndims) ]
+    universe = OpenToroidalUniverse(extents, open_dirs)
+    return _cubical_complex_base(ndims, extents, universe, with_midpoints=with_midpoints)
+
+# Returns the ``tensor product'' of its arguments. Each input tensor must have the
+# same number of indices, and the output is essentially the product of a and b (with no contraction),
+# The indices ordered in the following way:
+#  if a has indices labelled [a1, a2, a3]
+#  and b has indices labelled [b1, b2, b3]
+#  then the final order of indices of a x b is [a1,b1,a2,b2,a3,b3]
+# Finally, each set of indices (e.g. [a1,b1]) is collated.
+def tensor_product(*args):
+    def product_two(a,b):
+        nindices = len(a.shape)
+        ret = contract_array(a,b,{})
+        
+
+        p = []
+        for k in xrange(nindices):
+            p += [[k,k+nindices]]
+
+        ret = collate_array_indices(ret, p)
+        return ret
+
+    return reduce(product_two, args)
+
+def get_boundary_matrix_group_coboundary(G,n,k,cplx):
+    d = cplx.get_boundary_matrix()
+    return tensor.product(d, numpy.eye(G.size()**n))
+
+def get_stabilizer_group(cell,G):
+    gs = [g for g in G if cell.act_with(g) == cell]
+    try:
+        return G.subgroup(gs)
+    except AttributeError:
+        return gs
+
+class TorusTranslationGroup(object):
+    def __init__(self, *dims):
+        self.dims = numpy.array(dims, dtype=int)
+
+        self.els = [g for g in self]
+        self.els_reverse_lookup = dict()
+        for (i,g) in enumerate(self):
+            self.els_reverse_lookup[self.els[i]] = i
+
+    def __iter__(self):
+        return (TorusTranslationGroupElement(self, i) for i in itertools.product(*( xrange(d) for d in self.dims )))
+
+    def size(self):
+        return numpy.prod(self.dims)
+
+    def element_by_index(self,i):
+        return self.els[i]
+
+    def element_to_index(self,g):
+        return self.els_reverse_lookup[g]
+
+class MatrixQuotientGroupElement(object):
+    pass
+
+class TorusTranslationGroupElement(MatrixQuotientGroupElement):
+    def __init__(self, G, i):
+        assert len(i) == len(G.dims)
+        self.G = G
+        self.i = numpy.array(i, dtype=int) % G.dims
+        self.i.setflags(write=False)
+
+    def __mul__(a,b):
+        assert a.G is b.G
+        return TorusTranslationGroupElement(a.G, a.i + b.i)
+
+    def __inv__(self):
+        return TorusTranslationGroupElement(self.G, -self.i)
+
+    def __eq__(a,b):
+        assert a.G is b.G
+        return all(a.i == b.i)
+
+    def __ne__(a,b):
+        return not a == b
+
+    def __hash__(self):
+        return hash(self.i.data)
+
+    def toindex(self):
+        return self.G.element_to_index(self)
+
+    def __pow__(self,n):
+        return TorusTranslationGroupElement(self.G, -self.i)
+
+    def as_matrix_representative(self):
+        ndims = len(self.G.dims)
+        A = numpy.eye(ndims + 1, dtype=int)
+        A[0:(ndims+1),-1] = self.i
+        return matrix(A)
+
+class GapMatrixQuotientGroup(object):
+    def _base_init(self):
+        self.stored_coset_representatives = dict()
+        for g in self.sage_quotient_grp:
+            self.stored_coset_representatives[g] = self._coset_representative(g)
+
+        self.els = [g for g in self.sage_quotient_grp]
+        self.els_reverse_lookup = dict()
+        for i in xrange(len(self.els)):
+            self.els_reverse_lookup[self.els[i]] = i
+
+    def identity(self):
+        return GapMatrixQuotientGroupElement(self, self.sage_quotient_grp.identity())
+
+    def __init__(self, G,N):
+        self.homo_to_factor = gap.NaturalHomomorphismByNormalSubgroup(G,N)
+        quotient_group = gap.ImagesSource(self.homo_to_factor)
+        iso_to_perm = gap.IsomorphismPermGroup(quotient_group)
+        self.iso_to_perm_inverse = gap.InverseGeneralMapping(iso_to_perm)
+        self.gap_quotient_grp = gap.Image(iso_to_perm)
+        self.sage_quotient_grp = PermutationGroup(gap_group = self.gap_quotient_grp)
+        self.basegrp = self
+
+        self._base_init()
+
+        #self.multiplication_table = numpy.array(shape=(len(self.els),len(self.els)), dtype=int)
+        #for i in len(self.els):
+        #    for j in len(self.els):
+
+    def subgroup(self, gens):
+        G = GapMatrixQuotientGroup.__new__(GapMatrixQuotientGroup)
+        G.sage_quotient_grp = self.sage_quotient_grp.subgroup([g.sageperm for g in gens])
+        G.iso_to_perm_inverse = self.iso_to_perm_inverse
+        G.homo_to_factor = self.homo_to_factor
+        G.basegrp = self.basegrp
+        #G.basegrp = G
+        G._base_init()
+        return G
+
+    def __iter__(self):
+        return iter(self.elements())
+
+    def gens(self):
+        return [GapMatrixQuotientGroupElement(self.basegrp,g) for g in self.sage_quotient_grp.gens()]
+
+    def elements(self):
+        return [GapMatrixQuotientGroupElement(self.basegrp, g) for g in
+                self.sage_quotient_grp]
+
+    def element_to_index(self, g):
+        return self.els_reverse_lookup[g.sageperm]
+
+    def element_by_index(self,i):
+        return GapMatrixQuotientGroupElement(self.basegrp,self.els[i])
+
+    def _coset_representative(self,g):
+        g = gap(g)
+        return matrix(gap.PreImagesRepresentative(
+                self.homo_to_factor,
+                gap.Image(self.iso_to_perm_inverse, g)).sage())
+
+    def coset_representative(self,g):
+        return self.stored_coset_representatives[g.sageperm]
+
+    def __len__(self):
+        return self.size()
+
+    def size(self):
+        return len(self.els)
+
+class ElementWiseArray(tuple):
+    def __new__(cls, a):
+        return super(ElementWiseArray,cls).__new__(cls,a)
+
+    def __mod__(self, other):
+        assert len(self) == len(other)
+        return ElementWiseArray([x % y for (x,y) in itertools.izip(self,other)])
+    def __add__(self, other):
+        assert len(self) == len(other)
+        return ElementWiseArray([x + y for (x,y) in itertools.izip(self,other)])
+
+
+class GapMatrixQuotientGroupElement(MatrixQuotientGroupElement):
+    def __init__(self, G, sageperm):
+        self.G = G
+        self.sageperm = sageperm
+
+    def __mul__(a, b):
+        assert a.G is b.G
+        return GapMatrixQuotientGroupElement(a.G, a.sageperm*b.sageperm)
+
+    def __eq__(a,b):
+        return a.sageperm == b.sageperm
+
+    def __ne__(a,b):
+        return not a == b
+
+    def __pow__(self, n):
+        return GapMatrixQuotientGroupElement(self.G, self.sageperm**(-1))
+
+    def as_matrix_representative(self):
+        return self.G.coset_representative(self)
+
+    def toindex(self):
+        return self.G.element_to_index(self)
+
+class FiniteAbelianGroup(object):
+    def __init__(self, n):
+        self.n = ElementWiseArray(n)
+
+        self.els = [g for g in self]
+        self.els_reverse_lookup = dict()
+        for (i,g) in enumerate(self):
+            self.els_reverse_lookup[self.els[i]] = i
+
+    def element_to_index(self,g):
+        return self.els_reverse_lookup[g]
+
+    def element_by_index(self,i):
+        return self.els[i]
+
+    def identity(self):
+        return FiniteAbelianGroupElement(self)
+
+    def __iter__(self):
+        for x in itertools.product(*([range(n) for n in self.n])):
+            yield FiniteAbelianGroupElement(self, x)
+
+    def generators(self):
+        for i in xrange(len(self.n)):
+            k = [0]*len(self.n)
+            k[i] = 1
+            yield FiniteAbelianGroupElement(self, k)
+            
+    def el(self, k):
+        return FiniteAbelianGroupElement(self, k)
+
+    def size(self):
+        return numpy.prod(self.n)
+
+class FiniteAbelianGroupElement(object):
+    def __eq__(self, b):
+        return self.k == b.k
+    def __ne__(self,b):
+        return not self == b
+    def __hash__(self):
+        return hash(self.k)
+
+    def __init__(self, group, k=None):
+        if k is not None:
+            self.k = ElementWiseArray(k)
+        else:
+            self.k = ElementWiseArray([0]*len(group.n))
+        self.group = group
+
+    def parent(self):
+        return self.group
+
+    def toindex(self):
+        return self.group.element_to_index(self)
+
+    def __nonzero__(self):
+        return any(self.k)
+
+    def __mul__(a, b):
+        if a.group is not b.group and a.group != b.group:
+            raise ValueError, "Can only multiply elements of the same group."
+        return FiniteAbelianGroupElement(a.group, (a.k + b.k) % a.group.n)
+
+    def __repr__(self):
+        return str(tuple(self.k))
+
+    def __pow__(self,p):
+        return FiniteAbelianGroupElement(self.group, [(self.k[i]*p) % self.group.n[i] for i in xrange(len(self.k))])
+
+def toroidal_space_group(d,n,L):
+    G = gap.SpaceGroupIT(d,n)
+    trans = gap.translation_subgroup(G,L)
+    return GapQuotientGroup(G,trans)
+
+def solve_matrix_equation(A, b, over_ring=ZZ):
+    b = vector(over_ring,b)
+    A = scipy_sparse_matrix_to_sage(over_ring, A)
+    return A.solve_right(b).numpy(dtype=int)
+
+def solve_matrix_equation_with_constraint(A, subs_indices, xconstr, over_ring=ZZ):
+    """ Solves the equation Ax = 0, given the constraint that x[i] = xconstr[i]
+    for i in subs_indices. """ 
+
+    subs_indices_list = list(subs_indices)
+    subs_indices_set = frozenset(subs_indices)
+
+    notsubs_indices_set = frozenset(xrange(A.shape[1])) - subs_indices_set
+    notsubs_indices_list = list(notsubs_indices_set)
+
+    xconstr_reduced = xconstr[subs_indices_list]
+
+    print "slicing"
+    A_reduced_1 = A[:,notsubs_indices_list]
+    A_reduced_2 = A[:,subs_indices_list]
+
+    b = -A_reduced_2.dot(xconstr_reduced)
+
+    print "starting conversion"
+    A_reduced_1 = scipy_sparse_matrix_to_sage(over_ring, A_reduced_1)
+    b = vector(over_ring, b)
+
+    print "starting solve"
+    sol = A_reduced_1.solve_right(b).numpy()
+
+    sol_full = numpy.empty(A.shape[1], dtype=int)
+    sol_full[notsubs_indices_list] = sol
+    sol_full[subs_indices_list] = xconstr[subs_indices_list]
+
+    assert(numpy.count_nonzero(A.dot(sol_full) % 2) == 0)
+    return sol_full
+
+def scipy_sparse_matrix_to_sage(R, M):
+    if len(M.shape) != 2:
+        raise ValueError, "Need to start with rank-2 array"
+
+    M = sparse.coo_matrix(M)
+    Mdict = dict(((int(M.row[i]), int(M.col[i])), int(M.data[i])) for i in xrange(len(M.data)))
+
+    return matrix(R, M.shape[0], M.shape[1], Mdict)
+
+def get_notequal(G, val):
+    assert len(G) == 2
+    return (g for g in G if g != val).next()
+
+def get_nonidentity(G):
+    return get_notequal(G, G.identity())
+
+class SimplePermutee(object):
+    def __init__(self,k):
+        self.k = k % 2
+
+    def act_with(self,g):
+        assert isinstance(g, FiniteAbelianGroupElement)
+        if g.k[0] % 2 != 0:
+            return SimplePermutee((self.k + 1) % 2)
+        else:
+            return SimplePermutee(self.k)
+
+    def __eq__(a,b):
+        return a.k % 2 == b.k % 2
+
+    def __ne__(a,b):
+        return not a == b
+
+    def __hash__(self):
+        return self.k % 2
+
+    def orientation(self):
+        return 1
+
+    @staticmethod
+    def gen():
+        yield SimplePermutee(0)
+        yield SimplePermutee(1)
+
+class MultiIndexer(object):
+    def __init__(self, *dims):
+        self.dims = tuple(dims)
+
+    def to_index(self, *indices):
+        index = 0
+        stride = 1
+        for i in xrange(len(indices)):
+            index += stride*indices[i]
+            stride *= self.dims[i]
+
+        return index
+
+    def __call__(self, *indices):
+        return self.to_index(*indices)
+
+    def total_dim(self):
+        return numpy.prod(self.dims)
+
+class ComplexChainIndexer(object):
+    def __init__(self, n, cells, G):
+        self.internal_indexer = MultiIndexer(*( (G.size(),) * n + (len(cells),) ))
+
+    def to_index(self, gi, ci):
+        return self.internal_indexer.to_index(*(tuple(gi) + (ci,)))
+
+    def __call__(self, gi, ci):
+        return self.to_index(gi,ci)
+
+    def total_dim(self):
+        return self.internal_indexer.total_dim()
+
+def get_group_coboundary_matrix(cells, n,G, use_cython=True):
+    if use_cython:
+        return cython_fns.get_group_coboundary_matrix(cells,n,G)
+
+    indexer_out = MultiIndexer(*( (G.size(),) * (n+1) + (len(cells),) ))
+    indexer_in = MultiIndexer(*( (G.size(),) * n + (len(cells),) ))
+
+    A = sparse.dok_matrix((indexer_out.total_dim(), indexer_in.total_dim()), dtype=int)
+    #A = matrix(base_ring, indexer_out.total_dim(), indexer_in.total_dim(), sparse=True)
+
+    mapped_cell_indices, mapping_parities = get_group_action_on_cells(cells,G,inverse=True)
+
+    def build_index(ci_out, gi_out, ci_in, gi_in):
+        return indexer_out(*( gi_out + (ci_out,))) , indexer_in(*( gi_in + (ci_in,)))
+
+    for ci in xrange(len(cells)):
+        for gi in itertools.product(*( (xrange(G.size()),) * (n+1) )):
+            g = [ G.element_by_index(gii) for gii in gi ]
+            acted_ci = mapped_cell_indices[gi[0],ci]
+            parity = mapping_parities[gi[0],ci]
+
+            A[build_index(ci, gi, acted_ci, gi[1:])] += parity
+            print ci,acted_ci
+
+            A[build_index(ci, gi, ci, gi[0:-1])] += (-1)**(n+1)
+
+            for i in xrange(1,n+1):
+                a = (
+                      gi[0:(i-1)] + 
+                      ((g[i-1]*g[i]).toindex(),) + 
+                      gi[(i+1):]
+                    )
+                A[build_index(ci, gi, ci, a)] += (-1)**i
+
+    return A.tocsc()
+
+def get_action_on_cells(cells,action):
+    mapped_cell_indices = numpy.empty( len(cells), dtype=int)
+    mapping_parities = numpy.empty( len(cells), dtype=int)
+
+    for i in xrange(len(cells)):
+        acted_cell = cells[i].act_with(action)
+        acted_ci = cells.index(acted_cell)
+        parity = get_relative_orientation(cells[acted_ci].orientation(),
+                cells[acted_ci].orientation())
+
+        mapped_cell_indices[i] = acted_ci
+        mapping_parities[i] = parity
+        
+    return mapped_cell_indices, mapping_parities
+
+def get_group_action_on_cells(cells, G, inverse=False):
+    mapped_cell_indices = numpy.empty( (G.size(), len(cells)), dtype=int)
+    mapping_parities = numpy.empty( (G.size(), len(cells)), dtype=int)
+    
+    for (i,g) in enumerate(G):
+        mapped_cell_indices_g, mapping_parities_g = get_action_on_cells(cells,
+                g**(-1) if inverse else g)
+        mapped_cell_indices[i,:] = mapped_cell_indices_g
+        mapping_parities[i,:] = mapping_parities_g
+
+    return mapped_cell_indices, mapping_parities
+
+class ConvexComplex(object):
+    @staticmethod
+    def _get_action_matrix(cells,action):
+        cells = list(cells)
+        A = numpy.zeros( (len(cells), len(cells)), dtype=int)
+        for i in xrange(len(cells)):
+            j = ConvexComplex._get_action_on_cell_index(cells,i,action)
+            A[j,i] = get_relative_orientation(acted_cell.orientation(), cells[j].orientation())
+        return A
+
+    #def get_first_group_coboundary_matrix(self, G, k):
+    #    cells = self.cells[k]
+
+    #    A = numpy.zeros( (G.size(), len(cells), len(cells)), dtype=int)
+
+    #    for ci in xrange(len(cells)):
+    #        for g in G:
+    #            gi = g.toindex()
+
+    #            acted_cell = cells[ci].act_with( (g**(-1)).as_matrix_representative() )
+    #            acted_ci = cells.index(acted_cell)
+    #            parity = get_relative_orientation(acted_cell.orientation, cells[acted_ci].orientation) 
+
+    #            A[gi,ci,acted_ci] += parity
+    #            A[gi,ci,ci] += -1
+
+    #    return numpy.reshape(A, (G.size()*len(cells), len(cells)))
+    
+    def _get_action_on_cell_index(self,cells,action,i):
+        acted_cell = cells[i].act_with(action)
+        return cells.index(acted_cell)
+
+    def get_group_coboundary_matrix(self, n,G,k, use_cython=True):
+        return get_group_coboundary_matrix(self.cells[k],n,G, use_cython)
+
+    def get_action_matrix(self, k, action):
+        return ConvexComplex._get_action_matrix(self.cells[k], action)
+
+
+    def get_group_orbits(self, k, G):
+        cells = self.cells[k]
+        cell_indices = set(xrange(len(cells)))
+
+        orbits = []
+
+        while len(cell_indices) > 0:
+            orbit = set()
+
+            i = iter(cell_indices).next()
+
+            for g in G:
+                j = self._get_action_on_cell_index(cells,g,i)
+                orbit.add(j)
+                cell_indices.discard(j)
+
+            orbits.append(list(orbit))
+
+        return orbits
+
+    def get_boundary_matrix(self, k):
+        cells_km1 = list(self.cells[k-1])
+        cells_k = self.cells[k]
+
+        A = sparse.dok_matrix( (len(cells_km1), len(cells_k)), dtype=int )
+        for i in xrange(len(cells_k)):
+            for boundary_cell,coeff in self.boundary_data[cells_k[i]]:
+                j = cells_km1.index(boundary_cell)
+                A[j,i] += coeff
+        return A
+
+    # THIS METHOD DEPRECATED
+    def get_cochain_indexer_manual(self,k,n,G):
+        return MultiIndexer(*( (G.size(),) * n + (len(self.cells[k]),) ))
+
+    def get_chain_indexer(self,k,n,G):
+        return ComplexChainIndexer(n=n,G=G,cells=self.cells[k])
+
+    def get_boundary_matrix_group_cochain(self, k,n,G):
+        A = self.get_boundary_matrix(k)
+        return sparse.kron(A, sparse.eye(G.size()**n,dtype=int))
+
+    #def get_boundary_matrix_group_cochain_2(self, k,n,G):
+    #    A = self.get_boundary_matrix(k)
+    #    indexer_in = self.get_cochain_indexer_manual(k=k,n=n,G=G)
+    #    indexer_out = self.get_cochain_indexer_manual(k=(k-1), n=n, G=G)
+    #    AG = numpy.zeros((indexer_out.total_dim(),
+    #        indexer_in.total_dim()), dtype=int)
+
+    #    for gi in xrange(G.size()):
+    #        for ci_in in xrange(len(self.cells[k])):
+    #            for ci_out in xrange(len(self.cells[k-1])):
+    #                AG[indexer_out(gi, ci_out), indexer_in(gi,ci_in)] = A[ci_out,ci_in]
+
+    #    return AG
+
+    def add_cell(self, ndim, cell, boundary):
+        self.cells[ndim] += [cell]
+        self.boundary_data[cell] = boundary
+
+    def __init__(self,ndims):
+        self.ndims = ndims
+        self.cells = [None]*(ndims+1)
+        self.boundary_data = {}
+        for i in xrange(ndims+1):
+            self.cells[i] = []
+
+def test_has_solution(fn):
+    try:
+        fn()
+    except ValueError as e:
+        if e.args[0] == "matrix equation has no solutions":
+            return False
+        else:
+            raise e
+    return True
+
+def trivialized_by_E3_space(cplx,n,k,G,field, method='column_space'):
+    d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G)
+    d2 = cplx.get_boundary_matrix_group_cochain(n=(n+1), k=(k+2), G=G)
+    delta1 = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G)
+    delta2 = cplx.get_group_coboundary_matrix(n=(n+1), k=(k+2), G=G)
+
+    B = sparse.bmat([[d1,   None],
+                     [None, delta2],
+                     [delta1, -d2]])
+    if method == 'column_space_dense':
+        B = matrix(field, B.toarray().tolist())
+    else:
+        B = scipy_sparse_matrix_to_sage(field,B)
+
+    indexer = cplx.get_chain_indexer(n=n,k=k,G=G)
+
+    if method in ('column_space','column_space_dense'):
+        Vext = VectorSpace(field, B.nrows())
+        print "dim:", indexer.total_dim()
+        V = VectorSpace(field, indexer.total_dim())
+
+        column_space = B.column_space()
+        column_space_intersect = column_space.intersection(Vext.subspace(Vext.basis()[0:indexer.total_dim()]))
+
+        return V.subspace([v[0:indexer.total_dim()] for v in column_space_intersect.basis()])
+    elif method=='null_space':
+        P = sparse.bmat([[None,delta2],[delta1,-d2]])
+        P = scipy_sparse_matrix_to_sage(field,P)
+        print "about to call kernel()", P.nrows(), P.ncols()
+        nullspace = P.kernel()
+        return B.image(nullspace)
+    else:
+        raise ValueError, "Undefined method."
+
+def trivialized_by_E2_space(cplx,n,k,G,field):
+    d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G)
+    delta1 = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G)
+
+    delta2 = cplx.get_group_coboundary_matrix(n=0,k=0,G=G)
+
+    B = sparse.bmat([[d1],   [delta1]])
+    B = scipy_sparse_matrix_to_sage(field,B)
+
+    indexer = cplx.get_chain_indexer(n=n,k=k,G=G)
+
+    Vext = VectorSpace(field, B.nrows())
+    V = VectorSpace(field, indexer.total_dim())
+
+    column_space = B.column_space()
+    column_space_intersect = column_space.intersection(Vext.subspace(Vext.basis()[0:indexer.total_dim()]))
+
+    #ret = V.subspace([v[0:indexer.total_dim()] for v in column_space_intersect.basis()])
+    #delta2 = scipy_sparse_matrix_to_sage(field,delta2)
+    #for v in ret.basis():
+    #    print delta2*v
+
+    return V.subspace([v[0:indexer.total_dim()] for v in column_space_intersect.basis()])
+
+
+def find_E2_trivializer(cplx, a, n, k, G, over_ring):
+    d = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G)
+    delta = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G)
+
+    A = sparse.bmat([[d],[delta]])
+    b = numpy.bmat([a,numpy.zeros(A.shape[0]-len(a))]).flat
+    return solve_matrix_equation(A,b,over_ring)
+
+def find_E3_trivializer(cplx, a, n, k, G, over_ring):
+    # a is a k-chain, n-group cochain
+
+    d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G)
+    d2 = cplx.get_boundary_matrix_group_cochain(n=(n+1), k=(k+2), G=G)
+    delta1 = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G)
+    delta2 = cplx.get_group_coboundary_matrix(n=(n+1), k=(k+2), G=G)
+
+    A = sparse.bmat([[d1,   None],
+                     [None, delta2],
+                     [delta1, -d2]])
+    b = numpy.bmat([a,numpy.zeros(A.shape[0]-len(a))]).flat
+
+    return solve_matrix_equation(A,b, over_ring)
+
+def affine_transformation_rescale(A,scale):
+    A = copy(A)
+    d = A.nrows()-1
+    A[d,0:d] *= Integer(1)/scale
+    return A
+
+def affine_transformation_preserves_integer_lattice(A,scale):
+    A = affine_transformation_rescale(A,scale)
+    return A in MatrixSpace(ZZ, A.nrows())
+
+def space_group_preserves_integer_lattice(G,scale):
+    return all(affine_transformation_preserves_integer_lattice(matrix(A),scale) 
+            for A in gap.GeneratorsOfGroup(G).sage())
+
