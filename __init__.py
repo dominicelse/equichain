@@ -714,7 +714,6 @@ def get_group_coboundary_matrix(cells, n,G, use_cython=True):
             parity = mapping_parities[gi[0],ci]
 
             A[build_index(ci, gi, acted_ci, gi[1:])] += parity
-            print ci,acted_ci
 
             A[build_index(ci, gi, ci, gi[0:-1])] += (-1)**(n+1)
 
