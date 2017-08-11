@@ -231,31 +231,6 @@ def cubical_cell(ndims, basepoint_coords, direction, universe, with_midpoint=Fal
     else:
         return ConvexHullCell(points, orientation)
 
-
-#def cubical_cell_boundary(ndims, basepoint, direction,
-#        open_directions_forward=None, open_directions_backward=None):
-#
-#    if open_directions_forward is None:
-#        open_directions_forward = []
-#
-#    if open_directions_backward is None:
-#        open_directions_backward = []
-#
-#    coeffs = {}
-#    for face_direction in direction:
-#        remaining_directions = [ d for d in direction if d != face_direction ]
-#
-#        if face_direction not in open_directions_backward:
-#            coeffs[cubical_cell(ndims-1, basepoint, remaining_directions)] = -1
-#
-#        if face_direction not in open_directions_forward:
-#            coord = list(basepoint.coords)
-#            coord[face_direction] += 1
-#            coeffs[cubical_cell(ndims-1, Point(*coord), remaining_directions)] = 1
-#
-#    return FormalIntegerSum(coeffs)
-#
-
 def projected_levi_civita(ndims_universe, directions):
     E = numpy.zeros(shape=(ndims_universe,)*len(directions), dtype=int)
 
@@ -356,32 +331,6 @@ def cubical_complex(ndims, sizes, open_dirs, with_midpoints=False):
     extents = [ [-sizes[i],sizes[i]] for i in xrange(ndims) ]
     universe = OpenToroidalUniverse(extents, open_dirs)
     return _cubical_complex_base(ndims, extents, universe, with_midpoints=with_midpoints)
-
-# Returns the ``tensor product'' of its arguments. Each input tensor must have the
-# same number of indices, and the output is essentially the product of a and b (with no contraction),
-# The indices ordered in the following way:
-#  if a has indices labelled [a1, a2, a3]
-#  and b has indices labelled [b1, b2, b3]
-#  then the final order of indices of a x b is [a1,b1,a2,b2,a3,b3]
-# Finally, each set of indices (e.g. [a1,b1]) is collated.
-def tensor_product(*args):
-    def product_two(a,b):
-        nindices = len(a.shape)
-        ret = contract_array(a,b,{})
-        
-
-        p = []
-        for k in xrange(nindices):
-            p += [[k,k+nindices]]
-
-        ret = collate_array_indices(ret, p)
-        return ret
-
-    return reduce(product_two, args)
-
-def get_boundary_matrix_group_coboundary(G,n,k,cplx):
-    d = cplx.get_boundary_matrix()
-    return tensor.product(d, numpy.eye(G.size()**n))
 
 def get_stabilizer_group(cell,G):
     gs = [g for g in G if cell.act_with(g) == cell]
