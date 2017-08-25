@@ -3,18 +3,22 @@ from sage.all import *
 import chaincplx
 import numpy
 
+def make_twistgrp():
+    eye = matrix.identity(4)
+    rot = matrix([[0,1,0,0],[-1,0,0,0],[0,0,1,0],[0,0,0,1]])
+    trans = matrix([[1,0,0,0],[0,1,0,0],[0,0,1,1], [0,0,0,1]])
+    refl1 = matrix([[-1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]])
+    refl2 = matrix([[1,0,0,0],[0,-1,0,0],[0,0,1,0],[0,0,0,1]])
+    G = gap.AffineCrystGroupOnLeft(rot,trans,refl1,refl2)
+    N = gap.AffineCrystGroupOnLeft(trans**2)
+    return chaincplx.GapAffineQuotientGroup(G,N)
+
 class ComplexWithGroupActionGenericTests(object):
     def setUp(self):
         if self.descr == 'twistgrp':
-            eye = matrix.identity(4)
-            rot = matrix([[0,1,0,0],[-1,0,0,0],[0,0,1,0],[0,0,0,1]])
-            trans = matrix([[1,0,0,0],[0,1,0,0],[0,0,1,1], [0,0,0,1]])
-            refl1 = matrix([[-1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]])
-            refl2 = matrix([[1,0,0,0],[0,-1,0,0],[0,0,1,0],[0,0,0,1]])
-            G = gap.AffineCrystGroupOnLeft(rot,trans,refl1,refl2)
-            N = gap.AffineCrystGroupOnLeft(trans**2)
-            self.G = chaincplx.GapMatrixQuotientGroup(G,N)
-            self.cplx = chaincplx.cubical_complex(3, [1,1,1], [0,1], with_midpoints=True)
+            self.G = make_twistgrp()
+            self.cplx = chaincplx.cubical_complex(3, [1,1,1], [0,1],
+                    with_midpoints=True, pointclass=self.pointclass)
             self.R = Integers(2)
         else:
             raise ValueError, "not valid chain complex description"
@@ -47,7 +51,6 @@ class ComplexWithGroupActionGenericTests(object):
 
         return soln
 
-
     def test_cocycle_soln(self):
         for k in xrange(len(self.cplx.cells)):
             n = 1
@@ -67,6 +70,31 @@ class ComplexWithGroupActionGenericTests(object):
                     self.assertEqual(soln[indexer_in( (0,), ci)], 0)
                     self.assertEqual(soln[indexer_in( (s.toindex(),), ci)], 1)
 
+class ComplexWithGroupActionTestIntegerEquivalence(object):
+    def test_integer_equivalence(self):
+        cplx1 = self.make_complex(chaincplx.PointInUniverse)
+        cplx2 = self.make_complex(chaincplx.IntegerPointInUniverse)
+
+        for k in xrange(len(cplx1.cells)):
+            act1 = cplx1.get_group_action_on_cells(self.G,k,inverse=True)
+            act2 = cplx2.get_group_action_on_cells(self.G,k,inverse=True)
+            self.assertTrue(numpy.array_equal(act1[0],act2[0]))
+            self.assertTrue(numpy.array_equal(act1[1],act2[1]))
+
+        for k in xrange(1,len(cplx1.cells)):
+            D1 = cplx1.get_boundary_matrix(k)
+            D2 = cplx2.get_boundary_matrix(k)
+            self.assertTrue( (D1!=D2).nnz == 0)
+
+class TwistGrpIntegerTests(ComplexWithGroupActionTestIntegerEquivalence,
+        unittest.TestCase):
+
+    def setUp(self):
+        self.G = make_twistgrp()
+
+    def make_complex(self,pointclass):
+        return chaincplx.cubical_complex(3, [1,1,2], [0,1],
+                    with_midpoints=False, pointclass=pointclass)
 
 class TwistGrpTests(ComplexWithGroupActionGenericTests, unittest.TestCase):
     descr = "twistgrp"

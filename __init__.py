@@ -23,20 +23,13 @@ def powerset(iterable):
     return itertools.chain.from_iterable(itertools.combinations(s, r) for r in range(len(s)+1))
 
 class PointInUniverse(object):
-    def __init__(self, universe, *coords):
+    def __init__(self, universe, coords):
         self.universe = universe
         self.coords = copy(vector(QQ, universe.canonicalize_coords(coords)))
         self.coords.set_immutable()
 
-        self.original_coords = tuple(self.coords)
-        self.original_hash = None
-        self.original_hash = hash(self)
-
     def __hash__(self):
-        h = hash(self.coords)
-        if self.original_hash is not None and h != self.original_hash:
-            raise RuntimeError, "PointInUniverse: hash changed: " 
-        return h
+        return hash(self.coords)
 
     def __eq__(x,y):
         return x.coords == y.coords
@@ -71,7 +64,43 @@ class PointInUniverse(object):
 
         v = vector(tuple(self.coords) + (1,))
         vout = action*v
-        ret = PointInUniverse(self.universe, *(vout[:-1]))
+        ret = PointInUniverse(self.universe, vout[:-1])
+
+        return ret
+
+class IntegerPointInUniverse(object):
+    def __init__(self, universe, coords):
+        self.universe = universe
+        self.coords = sage_vector_to_numpy_int(universe.canonicalize_coords(coords))
+        self.coords.setflags(write=False)
+
+    def __hash__(self):
+        return hash(self.coords.data)
+
+    def __eq__(x,y):
+        return numpy.array_equal(x.coords,y.coords)
+
+    def __ne__(x,y):
+        return not x == y
+
+    def __str__(self):
+        return str(self.coords)
+
+    def __repr__(self):
+        return str(self)
+
+    def __len__(self):
+        return len(self.coords)
+
+    def act_with(self, action):
+        if isinstance(action, MatrixQuotientGroupElement):
+            action = action.as_matrix_representative_numpy_int()
+
+        v = numpy.empty(len(self.coords)+1, dtype=int)
+        v[0:-1] = self.coords
+        v[-1] = 1
+        vout = numpy.dot(action,v)
+        ret = IntegerPointInUniverse(self.universe, vout[:-1])
 
         return ret
 
@@ -94,7 +123,7 @@ class OpenToroidalUniverse(Universe):
                 coords[i] = (fracpart((coords[i]-self.extents[i][0]) / (self.extents[i][1] - self.extents[i][0]))
                         * (self.extents[i][1] - self.extents[i][0])
                         + self.extents[i][0])
-        return coords
+        return vector(QQ,coords)
 
     def point_in_interior(self, point):
         for d in xrange(len(self.extents)):
@@ -102,6 +131,10 @@ class OpenToroidalUniverse(Universe):
                 if point.coords[d] <= self.extents[d][0] or point.coords[d] >= self.extents[d][1]:
                     return False
         return True
+
+class FlatUniverse(Universe):
+    def canonicalize_coords(self, coords):
+        return coords
 
 class FormalIntegerSum(object):
     def __init__(self,coeffs={}):
@@ -208,7 +241,8 @@ class ConvexHullCellWithMidpoint(ConvexHullCell):
         return str(self)
 
 
-def cubical_cell(ndims, basepoint_coords, direction, universe, with_midpoint=False):
+def cubical_cell(ndims, basepoint_coords, direction, universe, with_midpoint,
+        scale, pointclass):
     assert len(direction) == ndims
 
     basepoint_coords = numpy.array(basepoint_coords)
@@ -216,15 +250,16 @@ def cubical_cell(ndims, basepoint_coords, direction, universe, with_midpoint=Fal
     for increment_dirs in powerset(direction):
         coord = numpy.copy(basepoint_coords)
         for d in increment_dirs:
-            coord[d] += 1
+            coord[d] += scale
         points += [ coord ]
 
     orientation = projected_levi_civita(len(basepoint_coords),direction)
 
-    midpoint = vector(QQ, sum(coord for coord in points))/len(points)
-    midpoint = PointInUniverse(universe, *midpoint)
+    if with_midpoint:
+        midpoint = vector(QQ, sum(coord for coord in points))/len(points)
+        midpoint = pointclass(universe, midpoint)
 
-    points = [ PointInUniverse(universe, *coord) for coord in points ]
+    points = [ pointclass(universe, coord) for coord in points ]
 
     if with_midpoint:
         return ConvexHullCellWithMidpoint(points, orientation, midpoint)
@@ -278,7 +313,7 @@ def get_relative_orientation(orientation1, orientation2):
         raise RuntimeError, "Orientations are not relative."
 
 def cubical_cell_boundary(ndims, basepoint_coords, direction, orientation,
-        universe, with_midpoints=False):
+        universe, with_midpoints, scale, pointclass):
     coeffs = {}
     for face_direction in direction:
         normal_vector = numpy.zeros(shape=(len(basepoint_coords),),dtype=int)
@@ -286,16 +321,16 @@ def cubical_cell_boundary(ndims, basepoint_coords, direction, orientation,
         remaining_directions = [ d for d in direction if d != face_direction ]
 
         cell = cubical_cell(ndims-1, basepoint_coords, remaining_directions,
-                universe, with_midpoint=with_midpoints)
+                universe, with_midpoints, scale, pointclass)
         if not universe.cell_on_boundary(cell):
             reduced_orientation = reduce_projected_levi_civita(orientation, normal_vector)
             coeffs[cell] = get_relative_orientation(reduced_orientation,
                     cell.orientation())
 
         coord = numpy.array(basepoint_coords)
-        coord[face_direction] += 1
+        coord[face_direction] += scale
         cell = cubical_cell(ndims-1, coord, remaining_directions, universe,
-                with_midpoint=with_midpoints)
+                with_midpoints, scale, pointclass)
         if not universe.cell_on_boundary(cell):
             reduced_orientation = reduce_projected_levi_civita(orientation, -normal_vector)
             coeffs[cell] = get_relative_orientation(reduced_orientation,
@@ -303,24 +338,26 @@ def cubical_cell_boundary(ndims, basepoint_coords, direction, orientation,
 
     return FormalIntegerSum(coeffs)
 
-def _cubical_complex_base(ndims, extents, universe, with_midpoints=False):
+def _cubical_complex_base(ndims, extents, universe, with_midpoints, scale, pointclass):
     cplx = ConvexComplex(ndims)
     for celldim in xrange(ndims+1):
         for direction in itertools.combinations(xrange(ndims),celldim):
-            coord_ranges = [ xrange(*extents[i])  for i in xrange(ndims) ]
+            coord_ranges = [ xrange(extents[i][0], extents[i][1], scale) for i in xrange(ndims) ]
             for coord in itertools.product(*coord_ranges):
                 cell = cubical_cell(celldim,coord,direction,
-                        universe, with_midpoint=with_midpoints)
+                        universe, with_midpoints, scale, pointclass)
                 if not universe.cell_on_boundary(cell):
                     cplx.add_cell(celldim,
                             cell,
                             cubical_cell_boundary(celldim,coord,direction,
                                 cell.orientation(), universe,
-                                with_midpoints=with_midpoints)
+                                with_midpoints,scale,
+                                pointclass)
                             )
     return cplx
 
-def cubical_complex(ndims, sizes, open_dirs, with_midpoints=False):
+def cubical_complex(ndims, sizes, open_dirs, with_midpoints=False, scale=1,
+        pointclass=PointInUniverse):
     assert len(sizes) == ndims
     assert all(d >= 0 and d < ndims for d in open_dirs)
 
@@ -330,7 +367,8 @@ def cubical_complex(ndims, sizes, open_dirs, with_midpoints=False):
 
     extents = [ [-sizes[i],sizes[i]] for i in xrange(ndims) ]
     universe = OpenToroidalUniverse(extents, open_dirs)
-    return _cubical_complex_base(ndims, extents, universe, with_midpoints=with_midpoints)
+    return _cubical_complex_base(ndims, extents, universe,
+            with_midpoints,scale,pointclass)
 
 def get_stabilizer_group(cell,G):
     gs = [g for g in G if cell.act_with(g) == cell]
@@ -399,7 +437,19 @@ class TorusTranslationGroupElement(MatrixQuotientGroupElement):
         A[0:(ndims+1),-1] = self.i
         return matrix(A)
 
-class GapMatrixQuotientGroup(object):
+def sage_matrix_to_numpy_int(A):
+    if not A in MatrixSpace(ZZ,A.nrows()):
+        raise ValueError, "Not an integer matrix."
+
+    return matrix(ZZ,A).numpy(dtype=int)
+
+def sage_vector_to_numpy_int(v):
+    if not v in FreeModule(ZZ,len(v)):
+        raise ValueError, "Not an integer vector." + str(v)
+
+    return vector(ZZ,v).numpy(dtype=int)
+
+class GapAffineQuotientGroup(object):
     def _base_init(self):
         self.stored_coset_representatives = dict()
         for g in self.sage_quotient_grp:
@@ -410,10 +460,12 @@ class GapMatrixQuotientGroup(object):
         for i in xrange(len(self.els)):
             self.els_reverse_lookup[self.els[i]] = i
 
-    def identity(self):
-        return GapMatrixQuotientGroupElement(self, self.sage_quotient_grp.identity())
+        self.stored_coset_representatives_numpy_int = None
 
-    def __init__(self, G,N):
+    def identity(self):
+        return GapAffineQuotientGroupElement(self, self.sage_quotient_grp.identity())
+
+    def __init__(self, G,N, scale=1):
         self.homo_to_factor = gap.NaturalHomomorphismByNormalSubgroup(G,N)
         quotient_group = gap.ImagesSource(self.homo_to_factor)
         iso_to_perm = gap.IsomorphismPermGroup(quotient_group)
@@ -421,6 +473,7 @@ class GapMatrixQuotientGroup(object):
         self.gap_quotient_grp = gap.Image(iso_to_perm)
         self.sage_quotient_grp = PermutationGroup(gap_group = self.gap_quotient_grp)
         self.basegrp = self
+        self.scale = scale
 
         self._base_init()
 
@@ -429,11 +482,13 @@ class GapMatrixQuotientGroup(object):
         #    for j in len(self.els):
 
     def subgroup(self, gens):
-        G = GapMatrixQuotientGroup.__new__(GapMatrixQuotientGroup)
+        G = GapAffineQuotientGroup.__new__(GapAffineQuotientGroup)
         G.sage_quotient_grp = self.sage_quotient_grp.subgroup([g.sageperm for g in gens])
         G.iso_to_perm_inverse = self.iso_to_perm_inverse
         G.homo_to_factor = self.homo_to_factor
         G.basegrp = self.basegrp
+        G.scale = self.scale
+        G.numpy_int_array_out = numpy_int_array_out
         #G.basegrp = G
         G._base_init()
         return G
@@ -442,26 +497,39 @@ class GapMatrixQuotientGroup(object):
         return iter(self.elements())
 
     def gens(self):
-        return [GapMatrixQuotientGroupElement(self.basegrp,g) for g in self.sage_quotient_grp.gens()]
+        return [GapAffineQuotientGroupElement(self.basegrp,g) for g in self.sage_quotient_grp.gens()]
 
     def elements(self):
-        return [GapMatrixQuotientGroupElement(self.basegrp, g) for g in
+        return [GapAffineQuotientGroupElement(self.basegrp, g) for g in
                 self.sage_quotient_grp]
 
     def element_to_index(self, g):
         return self.els_reverse_lookup[g.sageperm]
 
     def element_by_index(self,i):
-        return GapMatrixQuotientGroupElement(self.basegrp,self.els[i])
+        return GapAffineQuotientGroupElement(self.basegrp,self.els[i])
 
     def _coset_representative(self,g):
         g = gap(g)
-        return matrix(gap.PreImagesRepresentative(
+        A = matrix(gap.PreImagesRepresentative(
                 self.homo_to_factor,
                 gap.Image(self.iso_to_perm_inverse, g)).sage())
+        A = affine_transformation_rescale(A,self.scale)
+        return A
 
     def coset_representative(self,g):
         return self.stored_coset_representatives[g.sageperm]
+
+    def _compute_coset_representatives_numpy_int(self):
+        self.stored_coset_representatives_numpy_int = dict(
+                (g, sage_matrix_to_numpy_int(A))
+                for g,A in self.stored_coset_representatives.iteritems()
+                )
+
+    def coset_representative_numpy_int(self,g):
+        if self.stored_coset_representatives_numpy_int is None:
+            self._compute_coset_representatives_numpy_int()
+        return self.stored_coset_representatives_numpy_int[g.sageperm]
 
     def __len__(self):
         return self.size()
@@ -481,14 +549,14 @@ class ElementWiseArray(tuple):
         return ElementWiseArray([x + y for (x,y) in itertools.izip(self,other)])
 
 
-class GapMatrixQuotientGroupElement(MatrixQuotientGroupElement):
+class GapAffineQuotientGroupElement(MatrixQuotientGroupElement):
     def __init__(self, G, sageperm):
         self.G = G
         self.sageperm = sageperm
 
     def __mul__(a, b):
         assert a.G is b.G
-        return GapMatrixQuotientGroupElement(a.G, a.sageperm*b.sageperm)
+        return GapAffineQuotientGroupElement(a.G, a.sageperm*b.sageperm)
 
     def __eq__(a,b):
         return a.sageperm == b.sageperm
@@ -497,15 +565,18 @@ class GapMatrixQuotientGroupElement(MatrixQuotientGroupElement):
         return not a == b
 
     def __pow__(self, n):
-        return GapMatrixQuotientGroupElement(self.G, self.sageperm**(-1))
+        return GapAffineQuotientGroupElement(self.G, self.sageperm**(-1))
 
     def as_matrix_representative(self):
         return self.G.coset_representative(self)
 
+    def as_matrix_representative_numpy_int(self):
+        return self.G.coset_representative_numpy_int(self)
+
     def toindex(self):
         return self.G.element_to_index(self)
 
-class FiniteAbelianGroup(object):
+class FiniteAbelianGroup(object):    
     def __init__(self, n):
         self.n = ElementWiseArray(n)
 
@@ -792,7 +863,6 @@ class ConvexComplex(object):
     def get_action_matrix(self, k, action):
         return ConvexComplex._get_action_matrix(self.cells[k], action)
 
-
     def get_group_orbits(self, k, G):
         cells = self.cells[k]
         cell_indices = set(xrange(len(cells)))
@@ -860,6 +930,9 @@ class ConvexComplex(object):
         for i in xrange(ndims+1):
             self.cells[i] = []
 
+    def get_group_action_on_cells(self, G, k, inverse=False):
+        return get_group_action_on_cells(self.cells[k], G, inverse)
+
 def test_has_solution(fn):
     try:
         fn()
@@ -880,7 +953,13 @@ def trivialized_by_E3_space(cplx,n,k,G,field, method='column_space'):
                      [None, delta2],
                      [delta1, -d2]])
     if method == 'column_space_dense':
-        B = matrix(field, B.toarray().tolist())
+        B = B.toarray()
+        #B = B.tolist()
+
+        # For some reason sage doesn't create a matrix with the right base field
+        # if we just call it on a numpy array directly
+        B = matrix(ZZ, B)
+        B = matrix(field,B)
     else:
         B = scipy_sparse_matrix_to_sage(field,B)
 
@@ -888,7 +967,6 @@ def trivialized_by_E3_space(cplx,n,k,G,field, method='column_space'):
 
     if method in ('column_space','column_space_dense'):
         Vext = VectorSpace(field, B.nrows())
-        print "dim:", indexer.total_dim()
         V = VectorSpace(field, indexer.total_dim())
 
         column_space = B.column_space()
