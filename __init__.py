@@ -488,7 +488,6 @@ class GapAffineQuotientGroup(object):
         G.homo_to_factor = self.homo_to_factor
         G.basegrp = self.basegrp
         G.scale = self.scale
-        G.numpy_int_array_out = numpy_int_array_out
         #G.basegrp = G
         G._base_init()
         return G
