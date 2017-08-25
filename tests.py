@@ -18,7 +18,7 @@ class ComplexWithGroupActionGenericTests(object):
         if self.descr == 'twistgrp':
             self.G = make_twistgrp()
             self.cplx = chaincplx.cubical_complex(3, [1,1,1], [0,1],
-                    with_midpoints=True, pointclass=self.pointclass)
+                    with_midpoints=True)
             self.R = Integers(2)
         else:
             raise ValueError, "not valid chain complex description"
