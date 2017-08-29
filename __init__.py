@@ -547,6 +547,59 @@ class GapAffineQuotientGroup(object):
     def size(self):
         return len(self.els)
 
+class TrivialAffineMatrixGroupElement(MatrixQuotientGroupElement):
+    def __init__(self,d):
+        self.d = d
+
+    def __mul__(self, b):
+        return self
+
+    def __eq__(a,b):
+        return True
+
+    def __ne__(a,b):
+        return False
+
+    def __pow__(self, n):
+        return self
+
+    def as_matrix_representative(self):
+        return matrix.identity(ZZ,self.d+1)
+
+    def as_matrix_representative_numpy_int(self):
+        return numpy.eye(self.d+1, dtype=int)
+
+    def toindex(self):
+        return 0
+
+class TrivialAffineMatrixGroup(object):
+    def __init__(self, d):
+        self.d = d
+
+    def identity(self):
+        return TrivialAffineMatrixGroupElement(self.d)
+
+    def subgroup(self, gens):
+        return self
+
+    def __iter__(self):
+        return iter([self.identity()])
+
+    def gens(self):
+        return [self.identity()]
+
+    def elements(self):
+        return [self.identity()]
+
+    def element_by_index(self,i):
+        return self.identity()
+
+    def __len__(self):
+        return 1
+
+    def size(self):
+        return 1
+
 class ElementWiseArray(tuple):
     def __new__(cls, a):
         return super(ElementWiseArray,cls).__new__(cls,a)
