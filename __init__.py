@@ -12,6 +12,7 @@ if use_sage:
     from sage.all import *
 
     gap.load_package("Cryst")
+    from sage.matrix.matrix_mod2_dense import Matrix_mod2_dense
 else:
     ZZ = None
 
@@ -71,7 +72,7 @@ class PointInUniverse(object):
 class IntegerPointInUniverse(object):
     def __init__(self, universe, coords):
         self.universe = universe
-        self.coords = sage_vector_to_numpy_int(universe.canonicalize_coords(coords))
+        self.coords = universe.canonicalize_coords_int(coords)
         self.coords.setflags(write=False)
 
     def __hash__(self):
@@ -124,6 +125,14 @@ class OpenToroidalUniverse(Universe):
                         * (self.extents[i][1] - self.extents[i][0])
                         + self.extents[i][0])
         return vector(QQ,coords)
+
+    def canonicalize_coords_int(self, coords):
+        assert len(coords) == len(self.extents)
+        coords = numpy.array(coords, dtype=int)
+        for i in xrange(len(self.extents)):
+            if i not in self.open_dirs:
+                coords[i] = (coords[i] - self.extents[i][0]) % (self.extents[i][1] - self.extents[i][0]) + self.extents[i][0]
+        return coords
 
     def point_in_interior(self, point):
         for d in xrange(len(self.extents)):
@@ -256,6 +265,8 @@ def cubical_cell(ndims, basepoint_coords, direction, universe, with_midpoint,
     orientation = projected_levi_civita(len(basepoint_coords),direction)
 
     if with_midpoint:
+        if pointclass is IntegerPointWithMidpoint:
+            raise NotImplementedError
         midpoint = vector(QQ, sum(coord for coord in points))/len(points)
         midpoint = pointclass(universe, midpoint)
 
@@ -942,7 +953,40 @@ def test_has_solution(fn):
             raise e
     return True
 
-def trivialized_by_E3_space(cplx,n,k,G,field, method='column_space'):
+def sage_z2_matrix_from_numpy(A):
+    nrows,ncols = A.shape
+    B = Matrix_mod2_dense(MatrixSpace(GF(2),nrows,ncols), None,None,None)
+    B.set_unsafe_from_numpy_int_array(A)
+    return B
+    #return Matrix(GF(2), A)
+
+def trivialized_by_E3_space_Z2(cplx,n,k,G,method='column_space_dense'):
+    # An optimized version when the coefficients are Z_2.
+
+    d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G)
+    d2 = cplx.get_boundary_matrix_group_cochain(n=(n+1), k=(k+2), G=G)
+    delta1 = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G)
+    delta2 = cplx.get_group_coboundary_matrix(n=(n+1), k=(k+2), G=G)
+
+    indexer = cplx.get_chain_indexer(n=n,k=k,G=G)
+
+    B = sparse.bmat([[d1,   None],
+                     [None, delta2],
+                     [delta1, -d2]])
+    B = B.toarray()
+    Bsage = sage_z2_matrix_from_numpy(B)
+
+    a = numpy.eye(indexer.total_dim(), dtype=int)
+    b = numpy.zeros((B.shape[0]-indexer.total_dim(), indexer.total_dim()), dtype=int)
+    target_space_basis = numpy.bmat([[a],[b]])
+    W = numpy.bmat([[target_space_basis, -B[:,Bsage.pivots()]]])
+    Wsage = sage_z2_matrix_from_numpy(W)
+    kernel_matrix = Wsage.right_kernel_matrix(basis='computed')
+    return [ kernel_matrix[i,0:indexer.total_dim()] for i in xrange(kernel_matrix.nrows()) ]
+
+def trivialized_by_E3_space(cplx,n,k,G,field, method='column_space_dense', use_z2_optimization=True):
+    if use_z2_optimization and field in (GF(2), Integers(2)) and method == 'column_space_dense':
+        return trivialized_by_E3_space_Z2(cplx,n,k,G,method)
     d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G)
     d2 = cplx.get_boundary_matrix_group_cochain(n=(n+1), k=(k+2), G=G)
     delta1 = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G)
@@ -969,6 +1013,8 @@ def trivialized_by_E3_space(cplx,n,k,G,field, method='column_space'):
         V = VectorSpace(field, indexer.total_dim())
 
         column_space = B.column_space()
+        print column_space.dimension()
+        print len(B.pivots())
         column_space_intersect = column_space.intersection(Vext.subspace(Vext.basis()[0:indexer.total_dim()]))
 
         return V.subspace([v[0:indexer.total_dim()] for v in column_space_intersect.basis()])
