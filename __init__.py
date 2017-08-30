@@ -265,7 +265,7 @@ def cubical_cell(ndims, basepoint_coords, direction, universe, with_midpoint,
     orientation = projected_levi_civita(len(basepoint_coords),direction)
 
     if with_midpoint:
-        if pointclass is IntegerPointWithMidpoint:
+        if pointclass is IntegerPointInUniverse:
             raise NotImplementedError
         midpoint = vector(QQ, sum(coord for coord in points))/len(points)
         midpoint = pointclass(universe, midpoint)
@@ -1035,7 +1035,20 @@ def trivialized_by_E3_space_Z2(cplx,n,k,G,method='column_space_dense'):
     W = numpy.bmat([[target_space_basis, -B[:,Bsage.pivots()]]])
     Wsage = sage_z2_matrix_from_numpy(W)
     kernel_matrix = Wsage.right_kernel_matrix(basis='computed')
-    return [ kernel_matrix[i,0:indexer.total_dim()] for i in xrange(kernel_matrix.nrows()) ]
+    return [ numpy.array(kernel_matrix[i,0:indexer.total_dim()].numpy(dtype=int).flat) for i in xrange(kernel_matrix.nrows()) ]
+
+def trivialized_by_E3_but_not_E2(cplx,n,k,G,field):
+    triv_by_E3 = trivialized_by_E3_space(cplx,n,k,G,field)
+
+    ret = []
+    
+    for v in triv_by_E3:
+        print v
+        print len(v)
+        print len(cplx.cells[0])
+        if not test_has_solution(lambda: find_E2_trivializer(cplx,v,n,k,G,field)):
+            ret.append(v)
+    return ret
 
 def trivialized_by_E3_space(cplx,n,k,G,field, method='column_space_dense', use_z2_optimization=True):
     if use_z2_optimization and field in (GF(2), Integers(2)) and method == 'column_space_dense':
