@@ -1013,6 +1013,27 @@ def sage_z2_matrix_from_numpy(A):
     return B
     #return Matrix(GF(2), A)
 
+def column_space_intersection_with_other_space_z2(B, other_space_basis_matrix):
+    Bsage = sage_z2_matrix_from_numpy(B)
+
+    W = numpy.bmat([[other_space_basis_matrix, -B[:,Bsage.pivots()]]])
+    Wsage = sage_z2_matrix_from_numpy(W)
+    kernel_matrix = Wsage.right_kernel_matrix(basis='computed')
+
+    ret = [ numpy.dot(other_space_basis_matrix,
+        numpy.array(kernel_matrix.transpose()[0:other_space_basis_matrix.shape[1],i].numpy(dtype=int)).flatten()) % 2 for i in xrange(kernel_matrix.nrows()) ]
+
+    return ret
+
+def column_space_intersection_with_other_space(B, other_space_basis_matrix, field):
+    Bsage = matrix(field, B)
+    column_space = Bsage.column_space()
+    other_space = span([ vector(field, other_space_basis_matrix[:,i]) for i in
+        xrange(other_space_basis_matrix.shape[1]) ])
+    intersection = column_space.intersection(other_space)
+
+    return [ v for v in intersection.basis() ]
+
 def trivialized_by_E3_space_Z2(cplx,n,k,G,method='column_space_dense'):
     # An optimized version when the coefficients are Z_2.
 
@@ -1027,15 +1048,11 @@ def trivialized_by_E3_space_Z2(cplx,n,k,G,method='column_space_dense'):
                      [None, delta2],
                      [delta1, -d2]])
     B = B.toarray()
-    Bsage = sage_z2_matrix_from_numpy(B)
 
     a = numpy.eye(indexer.total_dim(), dtype=int)
     b = numpy.zeros((B.shape[0]-indexer.total_dim(), indexer.total_dim()), dtype=int)
-    target_space_basis = numpy.bmat([[a],[b]])
-    W = numpy.bmat([[target_space_basis, -B[:,Bsage.pivots()]]])
-    Wsage = sage_z2_matrix_from_numpy(W)
-    kernel_matrix = Wsage.right_kernel_matrix(basis='computed')
-    return [ numpy.array(kernel_matrix[i,0:indexer.total_dim()].numpy(dtype=int).flat) for i in xrange(kernel_matrix.nrows()) ]
+    target_space_basis = numpy.array(numpy.bmat([[a],[b]]))
+    return [ v[0:indexer.total_dim()] for v in column_space_intersection_with_other_space_z2(B, target_space_basis) ]
 
 def trivialized_by_E3_but_not_E2(cplx,n,k,G,field):
     triv_by_E3 = trivialized_by_E3_space(cplx,n,k,G,field)
@@ -1043,9 +1060,6 @@ def trivialized_by_E3_but_not_E2(cplx,n,k,G,field):
     ret = []
     
     for v in triv_by_E3:
-        print v
-        print len(v)
-        print len(cplx.cells[0])
         if not test_has_solution(lambda: find_E2_trivializer(cplx,v,n,k,G,field)):
             ret.append(v)
     return ret
@@ -1079,15 +1093,12 @@ def trivialized_by_E3_space(cplx,n,k,G,field, method='column_space_dense', use_z
         V = VectorSpace(field, indexer.total_dim())
 
         column_space = B.column_space()
-        print column_space.dimension()
-        print len(B.pivots())
         column_space_intersect = column_space.intersection(Vext.subspace(Vext.basis()[0:indexer.total_dim()]))
 
         return V.subspace([v[0:indexer.total_dim()] for v in column_space_intersect.basis()])
     elif method=='null_space':
         P = sparse.bmat([[None,delta2],[delta1,-d2]])
         P = scipy_sparse_matrix_to_sage(field,P)
-        print "about to call kernel()", P.nrows(), P.ncols()
         nullspace = P.kernel()
         return B.image(nullspace)
     else:
