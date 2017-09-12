@@ -20,6 +20,7 @@ class ComplexWithGroupActionGenericTests(object):
             self.cplx = chaincplx.cubical_complex(3, [1,1,1], [0,1],
                     with_midpoints=True)
             self.R = Integers(2)
+            self.encoder = chaincplx.get_numpy_encoder_Zn(2)
         else:
             raise ValueError, "not valid chain complex description"
 
@@ -114,7 +115,7 @@ class TwistGrpTests(ComplexWithGroupActionGenericTests, unittest.TestCase):
 
         # soln2 is 0-group-cocycle, 1-chain
         A2 = self.cplx.get_group_coboundary_matrix(0,self.G,1)
-        soln2 = chaincplx.solve_matrix_equation(A2, soln_boundary, over_ring=self.R)
+        soln2 = self.encoder.solve_matrix_equation(A2, soln_boundary)
 
         D2 = self.cplx.get_boundary_matrix(1)
         u = D2.dot(soln2) % 2
@@ -124,13 +125,13 @@ class TwistGrpTests(ComplexWithGroupActionGenericTests, unittest.TestCase):
     def test_E2(self):
         a = numpy.array([1,1])
         self.assertFalse(
-                chaincplx.test_has_solution(lambda:chaincplx.find_E2_trivializer(self.cplx,a,n=0,k=0,G=self.G,over_ring=self.R))
+                chaincplx.test_has_solution(lambda:chaincplx.find_E2_trivializer(self.cplx,a,n=0,k=0,G=self.G,encoder=self.encoder))
                 )
 
     def test_E3(self):
         a = numpy.array([1,1])
         self.assertFalse(
-                chaincplx.test_has_solution(lambda:chaincplx.find_E3_trivializer(self.cplx,a,n=0,k=0,G=self.G,over_ring=self.R))
+                chaincplx.test_has_solution(lambda:chaincplx.find_E3_trivializer(self.cplx,a,n=0,k=0,G=self.G,encoder=self.encoder))
                 )
 
 if __name__ == '__main__':

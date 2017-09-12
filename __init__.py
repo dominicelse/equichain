@@ -1202,7 +1202,7 @@ def find_E2_trivializer(cplx, a, n, k, G, encoder):
     b = numpy.bmat([a,numpy.zeros(A.shape[0]-len(a))]).flat
     return encoder.solve_matrix_equation(A,b)
 
-def find_E3_trivializer(cplx, a, n, k, G, over_ring):
+def find_E3_trivializer(cplx, a, n, k, G, encoder):
     # a is a k-chain, n-group cochain
 
     d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G)
@@ -1215,7 +1215,7 @@ def find_E3_trivializer(cplx, a, n, k, G, over_ring):
                      [delta1, -d2]])
     b = numpy.bmat([a,numpy.zeros(A.shape[0]-len(a))]).flat
 
-    return solve_matrix_equation(A,b, over_ring)
+    return encoder.solve_matrix_equation(A,b)
 
 def affine_transformation_rescale(A,scale):
     A = copy(A)
