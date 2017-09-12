@@ -266,8 +266,14 @@ def cubical_cell(ndims, basepoint_coords, direction, universe, with_midpoint,
 
     if with_midpoint:
         if pointclass is IntegerPointInUniverse:
-            raise NotImplementedError
-        midpoint = vector(QQ, sum(coord for coord in points))/len(points)
+            s = sum(points)
+            if not all(s % len(points) == 0):
+                raise ValueError, "Midpoint is not an integer point."
+            else:
+                midpoint = s//len(points)
+        else:
+            midpoint = vector(QQ, sum(points))/len(points)
+
         midpoint = pointclass(universe, midpoint)
 
     points = [ pointclass(universe, coord) for coord in points ]
@@ -376,7 +382,7 @@ def cubical_complex(ndims, sizes, open_dirs, with_midpoints=False, scale=1,
         if sizes[d] <= 1 and not d in open_dirs and not with_midpoints:
             raise ValueError, "Don't use this function to construct a compactified direction of length <= 2 without setting with_midpoints=True, this causes problems."
 
-    extents = [ [-sizes[i],sizes[i]] for i in xrange(ndims) ]
+    extents = [ [-sizes[i]*scale,sizes[i]*scale] for i in xrange(ndims) ]
     universe = OpenToroidalUniverse(extents, open_dirs)
     return _cubical_complex_base(ndims, extents, universe,
             with_midpoints,scale,pointclass)
@@ -448,9 +454,13 @@ class TorusTranslationGroupElement(MatrixQuotientGroupElement):
         A[0:(ndims+1),-1] = self.i
         return matrix(A)
 
+class NotIntegerMatrixError(Exception):
+    pass
+
 def sage_matrix_to_numpy_int(A):
     if not A in MatrixSpace(ZZ,A.nrows()):
-        raise ValueError, "Not an integer matrix."
+        print A
+        raise NotIntegerMatrixError
 
     return matrix(ZZ,A).numpy(dtype=int)
 
@@ -524,8 +534,8 @@ class GapAffineQuotientGroup(object):
         A = matrix(gap.PreImagesRepresentative(
                 self.homo_to_factor,
                 gap.Image(self.iso_to_perm_inverse, g)).sage())
-        A = affine_transformation_rescale(A,self.scale)
-        return A
+        B = affine_transformation_rescale(A,self.scale)
+        return B
 
     def coset_representative(self,g):
         return self.stored_coset_representatives[g.sageperm]
@@ -861,13 +871,19 @@ def get_group_coboundary_matrix(cells, n,G, use_cython=True):
 
     return A.tocsc()
 
+class ComplexNotInvariantError(Exception):
+    pass
+
 def get_action_on_cells(cells,action):
     mapped_cell_indices = numpy.empty( len(cells), dtype=int)
     mapping_parities = numpy.empty( len(cells), dtype=int)
 
     for i in xrange(len(cells)):
         acted_cell = cells[i].act_with(action)
-        acted_ci = cells.index(acted_cell)
+        try:
+            acted_ci = cells.index(acted_cell)
+        except ValueError:
+            raise ComplexNotInvariantError
         parity = get_relative_orientation(cells[acted_ci].orientation(),
                 cells[acted_ci].orientation())
 
@@ -1155,14 +1171,14 @@ def find_E3_trivializer(cplx, a, n, k, G, over_ring):
 def affine_transformation_rescale(A,scale):
     A = copy(A)
     d = A.nrows()-1
-    A[d,0:d] *= Integer(1)/scale
+    A[0:d,d] *= scale
     return A
 
 def affine_transformation_preserves_integer_lattice(A,scale):
     A = affine_transformation_rescale(A,scale)
     return A in MatrixSpace(ZZ, A.nrows())
 
-def space_group_preserves_integer_lattice(G,scale):
-    return all(affine_transformation_preserves_integer_lattice(matrix(A),scale) 
-            for A in gap.GeneratorsOfGroup(G).sage())
+#def space_group_preserves_integer_lattice(G,scale):
+#    return all(affine_transformation_preserves_integer_lattice(matrix(A),scale) 
+#            for A in gap.GeneratorsOfGroup(G).sage())
 
