@@ -1040,10 +1040,17 @@ class NumpyEncoderZN(NumpyEncoder):
         assert v.base_ring() == self.field
         return v
 
+    #def sage_matrix_from_numpy(self,A):
+    #    return matrix(self.field, A)
+
     def sage_matrix_from_numpy(self, A):
-        A = matrix(A,self.field)
-        assert A.base_ring() == self.field
-        return A
+        if sparse.issparse(A):
+            A = A.toarray()
+
+        nrows,ncols = A.shape
+        B = matrix(self.field, nrows, ncols)
+        B.set_unsafe_from_numpy_int_array(A % self.n)
+        return B
 
     def sage_vector_to_numpy(self, a):
         return numpy.array(a.numpy(dtype=int).flatten())
@@ -1064,20 +1071,12 @@ class NumpyEncoderZ2(NumpyEncoderZN):
     def __init__(self):
         super(NumpyEncoderZ2,self).__init__(2)
 
-    def sage_matrix_from_numpy(self, A):
-        if sparse.issparse(A):
-            A = A.toarray()
-
-        nrows,ncols = A.shape
-        B = Matrix_mod2_dense(MatrixSpace(GF(2),nrows,ncols), None,None,None)
-        B.set_unsafe_from_numpy_int_array(A)
-        return B
 
 def get_numpy_encoder_Zn(n):
     if n == 2:
         return NumpyEncoderZ2()
     elif n > 2:
-        return NumpyEncoderZn(n)
+        return NumpyEncoderZN(n)
 
 def column_space_intersection_with_other_space(B, other_space_basis_matrix, encoder):
     Bsage = encoder.sage_matrix_from_numpy(B)
