@@ -723,10 +723,10 @@ def toroidal_space_group(d,n,L):
     trans = gap.translation_subgroup(G,L)
     return GapQuotientGroup(G,trans)
 
-def solve_matrix_equation(A, b, over_ring=ZZ):
-    b = vector(over_ring,b)
-    A = scipy_sparse_matrix_to_sage(over_ring, A)
-    return A.solve_right(b).numpy(dtype=int)
+#def solve_matrix_equation(A, b, over_ring=ZZ):
+#    b = vector(over_ring,b)
+#    A = scipy_sparse_matrix_to_sage(over_ring, A)
+#    return A.solve_right(b).numpy(dtype=int)
 
 def solve_matrix_equation_with_constraint(A, subs_indices, xconstr, over_ring=ZZ):
     """ Solves the equation Ax = 0, given the constraint that x[i] = xconstr[i]
@@ -1022,37 +1022,87 @@ def test_has_solution(fn):
             raise e
     return True
 
-def sage_z2_matrix_from_numpy(A):
-    nrows,ncols = A.shape
-    B = Matrix_mod2_dense(MatrixSpace(GF(2),nrows,ncols), None,None,None)
-    B.set_unsafe_from_numpy_int_array(A)
-    return B
-    #return Matrix(GF(2), A)
+class NumpyEncoder(object):
+    def solve_matrix_equation(self,A,b):
+        return self.sage_vector_to_numpy(
+                self.sage_matrix_from_numpy(A).solve_right(
+                    self.sage_vector_from_numpy(b) ) )
 
-def column_space_intersection_with_other_space_z2(B, other_space_basis_matrix):
-    Bsage = sage_z2_matrix_from_numpy(B)
+class NumpyEncoderZN(NumpyEncoder):
+    def __init__(self, n):
+        self.field = Integers(n)
+        if not is_field(self.field):
+            raise ValueError, "Not sure if the code logic is correct if we're working in a field."
+        self.n = n
+
+    def sage_vector_from_numpy(self,a):
+        v = vector(a,self.field)
+        assert v.base_ring() == self.field
+        return v
+
+    def sage_matrix_from_numpy(self, A):
+        A = matrix(A,self.field)
+        assert A.base_ring() == self.field
+        return A
+
+    def sage_vector_to_numpy(self, a):
+        return numpy.array(a.numpy(dtype=int).flatten())
+
+    def numpy_matrix_multiply(self, A,B):
+        return numpy.dot(A, B) % self.n
+
+    def numpy_eye(self, n):
+        return numpy.eye(n, dtype=int)
+
+    def numpy_zeros(self, shape):
+        return numpy.zeros(shape, dtype=int)
+
+    def sage_matrix_to_numpy(self, A):
+        return numpy.array(A.numpy(dtype=int))
+
+class NumpyEncoderZ2(NumpyEncoderZN):
+    def __init__(self):
+        super(NumpyEncoderZ2,self).__init__(2)
+
+    def sage_matrix_from_numpy(self, A):
+        if sparse.issparse(A):
+            A = A.toarray()
+
+        nrows,ncols = A.shape
+        B = Matrix_mod2_dense(MatrixSpace(GF(2),nrows,ncols), None,None,None)
+        B.set_unsafe_from_numpy_int_array(A)
+        return B
+
+def get_numpy_encoder_Zn(n):
+    if n == 2:
+        return NumpyEncoderZ2()
+    elif n > 2:
+        return NumpyEncoderZn(n)
+
+def column_space_intersection_with_other_space(B, other_space_basis_matrix, encoder):
+    Bsage = encoder.sage_matrix_from_numpy(B)
 
     W = numpy.bmat([[other_space_basis_matrix, -B[:,Bsage.pivots()]]])
-    Wsage = sage_z2_matrix_from_numpy(W)
+    Wsage = encoder.sage_matrix_from_numpy(W)
     kernel_matrix = Wsage.right_kernel_matrix(basis='computed')
 
-    ret = [ numpy.dot(other_space_basis_matrix,
-        numpy.array(kernel_matrix.transpose()[0:other_space_basis_matrix.shape[1],i].numpy(dtype=int)).flatten()) % 2 for i in xrange(kernel_matrix.nrows()) ]
+    ret = [ encoder.numpy_matrix_multiply(
+                other_space_basis_matrix,
+                encoder.sage_matrix_to_numpy(kernel_matrix.transpose()[0:other_space_basis_matrix.shape[1],i]).flatten(),
+           ) for i in xrange(kernel_matrix.nrows()) ]
 
     return ret
 
-def column_space_intersection_with_other_space(B, other_space_basis_matrix, field):
-    Bsage = matrix(field, B)
-    column_space = Bsage.column_space()
-    other_space = span([ vector(field, other_space_basis_matrix[:,i]) for i in
-        xrange(other_space_basis_matrix.shape[1]) ])
-    intersection = column_space.intersection(other_space)
+#def column_space_intersection_with_other_space(B, other_space_basis_matrix, field):
+#    Bsage = matrix(field, B)
+#    column_space = Bsage.column_space()
+#    other_space = span([ vector(field, other_space_basis_matrix[:,i]) for i in
+#        xrange(other_space_basis_matrix.shape[1]) ])
+#    intersection = column_space.intersection(other_space)
+#
+#    return [ v for v in intersection.basis() ]
 
-    return [ v for v in intersection.basis() ]
-
-def trivialized_by_E3_space_Z2(cplx,n,k,G,method='column_space_dense'):
-    # An optimized version when the coefficients are Z_2.
-
+def trivialized_by_E3_space(cplx,n,k,G,encoder,method='column_space_dense'):
     d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G)
     d2 = cplx.get_boundary_matrix_group_cochain(n=(n+1), k=(k+2), G=G)
     delta1 = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G)
@@ -1065,60 +1115,60 @@ def trivialized_by_E3_space_Z2(cplx,n,k,G,method='column_space_dense'):
                      [delta1, -d2]])
     B = B.toarray()
 
-    a = numpy.eye(indexer.total_dim(), dtype=int)
-    b = numpy.zeros((B.shape[0]-indexer.total_dim(), indexer.total_dim()), dtype=int)
+    a = encoder.numpy_eye(indexer.total_dim())
+    b = encoder.numpy_zeros((B.shape[0]-indexer.total_dim(), indexer.total_dim()))
     target_space_basis = numpy.array(numpy.bmat([[a],[b]]))
-    return [ v[0:indexer.total_dim()] for v in column_space_intersection_with_other_space_z2(B, target_space_basis) ]
+    return [ v[0:indexer.total_dim()] for v in column_space_intersection_with_other_space(B, target_space_basis, encoder) ]
 
-def trivialized_by_E3_but_not_E2(cplx,n,k,G,field):
-    triv_by_E3 = trivialized_by_E3_space(cplx,n,k,G,field)
+def trivialized_by_E3_but_not_E2(cplx,n,k,G,encoder):
+    triv_by_E3 = trivialized_by_E3_space(cplx,n,k,G,encoder)
 
     ret = []
     
     for v in triv_by_E3:
-        if not test_has_solution(lambda: find_E2_trivializer(cplx,v,n,k,G,field)):
+        if not test_has_solution(lambda: find_E2_trivializer(cplx,v,n,k,G,encoder)):
             ret.append(v)
     return ret
 
-def trivialized_by_E3_space(cplx,n,k,G,field, method='column_space_dense', use_z2_optimization=True):
-    if use_z2_optimization and field in (GF(2), Integers(2)) and method == 'column_space_dense':
-        return trivialized_by_E3_space_Z2(cplx,n,k,G,method)
-    d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G)
-    d2 = cplx.get_boundary_matrix_group_cochain(n=(n+1), k=(k+2), G=G)
-    delta1 = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G)
-    delta2 = cplx.get_group_coboundary_matrix(n=(n+1), k=(k+2), G=G)
-
-    B = sparse.bmat([[d1,   None],
-                     [None, delta2],
-                     [delta1, -d2]])
-    if method == 'column_space_dense':
-        B = B.toarray()
-        #B = B.tolist()
-
-        # For some reason sage doesn't create a matrix with the right base field
-        # if we just call it on a numpy array directly
-        B = matrix(ZZ, B)
-        B = matrix(field,B)
-    else:
-        B = scipy_sparse_matrix_to_sage(field,B)
-
-    indexer = cplx.get_chain_indexer(n=n,k=k,G=G)
-
-    if method in ('column_space','column_space_dense'):
-        Vext = VectorSpace(field, B.nrows())
-        V = VectorSpace(field, indexer.total_dim())
-
-        column_space = B.column_space()
-        column_space_intersect = column_space.intersection(Vext.subspace(Vext.basis()[0:indexer.total_dim()]))
-
-        return V.subspace([v[0:indexer.total_dim()] for v in column_space_intersect.basis()])
-    elif method=='null_space':
-        P = sparse.bmat([[None,delta2],[delta1,-d2]])
-        P = scipy_sparse_matrix_to_sage(field,P)
-        nullspace = P.kernel()
-        return B.image(nullspace)
-    else:
-        raise ValueError, "Undefined method."
+#def trivialized_by_E3_space(cplx,n,k,G,field, method='column_space_dense', use_z2_optimization=True):
+#    if use_z2_optimization and field in (GF(2), Integers(2)) and method == 'column_space_dense':
+#        return trivialized_by_E3_space_Z2(cplx,n,k,G,method)
+#    d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G)
+#    d2 = cplx.get_boundary_matrix_group_cochain(n=(n+1), k=(k+2), G=G)
+#    delta1 = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G)
+#    delta2 = cplx.get_group_coboundary_matrix(n=(n+1), k=(k+2), G=G)
+#
+#    B = sparse.bmat([[d1,   None],
+#                     [None, delta2],
+#                     [delta1, -d2]])
+#    if method == 'column_space_dense':
+#        B = B.toarray()
+#        #B = B.tolist()
+#
+#        # For some reason sage doesn't create a matrix with the right base field
+#        # if we just call it on a numpy array directly
+#        B = matrix(ZZ, B)
+#        B = matrix(field,B)
+#    else:
+#        B = scipy_sparse_matrix_to_sage(field,B)
+#
+#    indexer = cplx.get_chain_indexer(n=n,k=k,G=G)
+#
+#    if method in ('column_space','column_space_dense'):
+#        Vext = VectorSpace(field, B.nrows())
+#        V = VectorSpace(field, indexer.total_dim())
+#
+#        column_space = B.column_space()
+#        column_space_intersect = column_space.intersection(Vext.subspace(Vext.basis()[0:indexer.total_dim()]))
+#
+#        return V.subspace([v[0:indexer.total_dim()] for v in column_space_intersect.basis()])
+#    elif method=='null_space':
+#        P = sparse.bmat([[None,delta2],[delta1,-d2]])
+#        P = scipy_sparse_matrix_to_sage(field,P)
+#        nullspace = P.kernel()
+#        return B.image(nullspace)
+#    else:
+#        raise ValueError, "Undefined method."
 
 def trivialized_by_E2_space(cplx,n,k,G,field):
     d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G)
@@ -1145,13 +1195,13 @@ def trivialized_by_E2_space(cplx,n,k,G,field):
     return V.subspace([v[0:indexer.total_dim()] for v in column_space_intersect.basis()])
 
 
-def find_E2_trivializer(cplx, a, n, k, G, over_ring):
+def find_E2_trivializer(cplx, a, n, k, G, encoder):
     d = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G)
     delta = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G)
 
     A = sparse.bmat([[d],[delta]])
     b = numpy.bmat([a,numpy.zeros(A.shape[0]-len(a))]).flat
-    return solve_matrix_equation(A,b,over_ring)
+    return encoder.solve_matrix_equation(A,b)
 
 def find_E3_trivializer(cplx, a, n, k, G, over_ring):
     # a is a k-chain, n-group cochain
