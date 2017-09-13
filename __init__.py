@@ -409,24 +409,6 @@ class SimplePermutee(object):
         yield SimplePermutee(0)
         yield SimplePermutee(1)
 
-class MultiIndexer(object):
-    def __init__(self, *dims):
-        self.dims = tuple(dims)
-
-    def to_index(self, *indices):
-        index = 0
-        stride = 1
-        for i in xrange(len(indices)):
-            index += stride*indices[i]
-            stride *= self.dims[i]
-
-        return index
-
-    def __call__(self, *indices):
-        return self.to_index(*indices)
-
-    def total_dim(self):
-        return numpy.prod(self.dims)
 
 class ComplexChainIndexer(object):
     def __init__(self, n, cells, G):

@@ -1,4 +1,5 @@
 import copy
+import numpy
 
 def powerset(iterable):
     "powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"
@@ -71,3 +72,21 @@ class FormalIntegerSum(object):
     def __repr__(self):
         return str(self)
 
+class MultiIndexer(object):
+    def __init__(self, *dims):
+        self.dims = tuple(dims)
+
+    def to_index(self, *indices):
+        index = 0
+        stride = 1
+        for i in xrange(len(indices)):
+            index += stride*indices[i]
+            stride *= self.dims[i]
+
+        return index
+
+    def __call__(self, *indices):
+        return self.to_index(*indices)
+
+    def total_dim(self):
+        return numpy.prod(self.dims)
