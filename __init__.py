@@ -12,6 +12,7 @@ if use_sage:
     from sage.all import *
 
     gap.load_package("Cryst")
+    gap.SetCrystGroupDefaultAction(gap.LeftAction)
     from sage.matrix.matrix_mod2_dense import Matrix_mod2_dense
 else:
     ZZ = None
@@ -1216,6 +1217,31 @@ def find_E3_trivializer(cplx, a, n, k, G, encoder):
     b = numpy.bmat([a,numpy.zeros(A.shape[0]-len(a))]).flat
 
     return encoder.solve_matrix_equation(A,b)
+
+def gap_space_group_translation_subgroup(G,n):
+    gap_fn = gap("""function(G,n)
+    local T,basis,translation_to_affine;
+
+    translation_to_affine := function(T)
+        local n,A,i;
+        n := Length(T);
+        A := NullMat(n+1,n+1);
+        for i in [1..n] do
+            A[i][n+1] := T[i];
+        od;
+        for i in [1..(n+1)] do
+            A[i][i] := 1;
+        od;
+        return A;
+    end;
+
+    basis := TranslationBasis(G)*n;
+    T := List(basis,translation_to_affine);
+    return Subgroup(G, T);
+    end;
+    """)
+
+    return gap_fn(G,n)
 
 def affine_transformation_rescale(A,scale):
     A = copy(A)
