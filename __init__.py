@@ -710,23 +710,41 @@ def column_space_intersection_with_other_space(B, other_space_basis_matrix, enco
 #
 #    return [ v for v in intersection.basis() ]
 
-def trivialized_by_E3_space(cplx,n,k,G,encoder,method='column_space_dense'):
+def image_of_constrained_subspace(A,B,encoder):
+    """ Finds the basis matrix for the space of vectors v such that there exists
+    x with Bx = 0 such that Ax = v. """
+
+    if A.shape[1] != B.shape[1]:
+        raise ValueError
+    if A.dtype != B.dtype:
+        raise TypeError
+
+    AB = numpy.empty( (A.shape[0] + B.shape[0], A.shape[1]), A.dtype)
+    AB[0:A.shape[0],:] = A
+    AB[A.shape[0]:,:] = B
+
+    a = encoder.numpy_eye(A.shape[0])
+    b = encoder.numpy_zeros( (B.shape[0],A.shape[0]) )
+    target_space_basis = numpy.array(numpy.bmat([[a],
+                                                 [b]]))
+    return [ v[0:A.shape[0]] for v in column_space_intersection_with_other_space(AB, target_space_basis,
+                encoder) ]
+
+def trivialized_by_E3_space(cplx,n,k,G,encoder):
     d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G)
     d2 = cplx.get_boundary_matrix_group_cochain(n=(n+1), k=(k+2), G=G)
     delta1 = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G)
     delta2 = cplx.get_group_coboundary_matrix(n=(n+1), k=(k+2), G=G)
 
-    indexer = cplx.get_chain_indexer(n=n,k=k,G=G)
+    z = encoder.numpy_zeros((d1.shape[0], delta2.shape[1]))
+    A = numpy.bmat([[d1.toarray(),z]])
 
-    B = sparse.bmat([[d1,   None],
-                     [None, delta2],
+    B = sparse.bmat([[None, delta2],
                      [delta1, -d2]])
     B = B.toarray()
 
-    a = encoder.numpy_eye(indexer.total_dim())
-    b = encoder.numpy_zeros((B.shape[0]-indexer.total_dim(), indexer.total_dim()))
-    target_space_basis = numpy.array(numpy.bmat([[a],[b]]))
-    return [ v[0:indexer.total_dim()] for v in column_space_intersection_with_other_space(B, target_space_basis, encoder) ]
+    return image_of_constrained_subspace(A,B,encoder)
+
 
 def trivialized_by_E3_but_not_E2(cplx,n,k,G,encoder):
     triv_by_E3 = trivialized_by_E3_space(cplx,n,k,G,encoder)
@@ -778,30 +796,11 @@ def trivialized_by_E3_but_not_E2(cplx,n,k,G,encoder):
 #    else:
 #        raise ValueError, "Undefined method."
 
-def trivialized_by_E2_space(cplx,n,k,G,field):
+def trivialized_by_E2_space(cplx,n,k,G,encoder):
     d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G)
     delta1 = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G)
 
-    delta2 = cplx.get_group_coboundary_matrix(n=0,k=0,G=G)
-
-    B = sparse.bmat([[d1],   [delta1]])
-    B = scipy_sparse_matrix_to_sage(field,B)
-
-    indexer = cplx.get_chain_indexer(n=n,k=k,G=G)
-
-    Vext = VectorSpace(field, B.nrows())
-    V = VectorSpace(field, indexer.total_dim())
-
-    column_space = B.column_space()
-    column_space_intersect = column_space.intersection(Vext.subspace(Vext.basis()[0:indexer.total_dim()]))
-
-    #ret = V.subspace([v[0:indexer.total_dim()] for v in column_space_intersect.basis()])
-    #delta2 = scipy_sparse_matrix_to_sage(field,delta2)
-    #for v in ret.basis():
-    #    print delta2*v
-
-    return V.subspace([v[0:indexer.total_dim()] for v in column_space_intersect.basis()])
-
+    return image_of_constrained_subspace(d1.toarray(), delta1.toarray(), encoder)
 
 def find_E2_trivializer(cplx, a, n, k, G, encoder):
     d = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G)

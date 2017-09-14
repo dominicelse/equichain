@@ -203,6 +203,12 @@ class SpaceGroupTests(unittest.TestCase):
             self.assertEqual(len(space), len(expected))
             self.assertTrue( all(numpy.array_equal(v,w) for v,w in itertools.izip(space, expected)))
 
+            space = chaincplx.trivialized_by_E2_space(self.cplx,0,0,Gq,
+                        chaincplx.get_numpy_encoder_Zn(n=n))
+
+            self.assertEqual(len(space), len(expected))
+            self.assertTrue( all(numpy.array_equal(v,w) for v,w in itertools.izip(space, expected)))
+
 if __name__ == '__main__':
     unittest.main()
     #a = TwistGrpTests()
