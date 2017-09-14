@@ -1,5 +1,7 @@
 import copy
 import numpy
+from scipy import sparse
+import itertools
 
 def powerset(iterable):
     "powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"
@@ -76,6 +78,10 @@ class MultiIndexer(object):
     def __init__(self, *dims):
         self.dims = tuple(dims)
 
+    @staticmethod
+    def tensor(dim, ntimes):
+        return MultiIndexer(*( (dim,)*ntimes ))
+
     def to_index(self, *indices):
         index = 0
         stride = 1
@@ -85,8 +91,49 @@ class MultiIndexer(object):
 
         return index
 
+    def from_index(self,I):
+        assert I >= 0 and I < self.total_dim()
+        I0 = I
+        ret = numpy.zeros(len(self.dims), dtype=int)
+        for i in xrange(len(self.dims)):
+            ret[i] = I % self.dims[i]
+            I = (I - ret[i])//self.dims[i]
+        assert self.to_index(*ret) == I0
+        return tuple(ret)
+
     def __call__(self, *indices):
         return self.to_index(*indices)
 
     def total_dim(self):
         return numpy.prod(self.dims)
+
+class MatrixIndexingWrapper(object):
+    def __init__(self, A, out_indexer, in_indexer):
+        assert len(A.shape) == 2
+        assert A.shape[0] == out_indexer.total_dim()
+        assert A.shape[1] == in_indexer.total_dim()
+
+        self.A = A
+        self.out_indexer = out_indexer
+        self.in_indexer = in_indexer
+
+    @staticmethod
+    def from_factory(factory, dtype, out_indexer, in_indexer):
+        A = factory( (out_indexer.total_dim(), in_indexer.total_dim()), dtype=dtype)
+        return MatrixIndexingWrapper(A, out_indexer, in_indexer)
+
+    def _convert_index(self, i):
+        return (self.out_indexer.to_index(*i[0]), self.in_indexer.to_index(*i[1]))
+
+    def __getitem__(self,i):
+        #print i, self._convert_index(i), self.A.shape
+        return self.A[self._convert_index(i)]
+
+    def __setitem__(self, i, value):
+        self.A[self._convert_index(i)] = value
+
+    def raw_access(self):
+        return self.A
+
+    def set_raw(self,A):
+        self.A = A

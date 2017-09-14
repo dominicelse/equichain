@@ -8,6 +8,7 @@ from scipy import sparse
 from chaincplx.utils import *
 from chaincplx.grps import *
 from chaincplx.sageutils import *
+import chaincplx.resolutions as resolutions
 from sage.all import *
 
 from sage.matrix.matrix_mod2_dense import Matrix_mod2_dense
@@ -409,6 +410,22 @@ class SimplePermutee(object):
         yield SimplePermutee(0)
         yield SimplePermutee(1)
 
+class TrivialPermutee(object):
+    def act_with(self,g):
+        return self
+
+    def __eq__(a,b):
+        return True
+
+    def __ne__(a,b):
+        return False
+
+    def __hash__(self):
+        return 0
+
+    def orientation(self):
+        return 1
+
 
 class ComplexChainIndexer(object):
     def __init__(self, n, cells, G):
@@ -423,9 +440,15 @@ class ComplexChainIndexer(object):
     def total_dim(self):
         return self.internal_indexer.total_dim()
 
-def get_group_coboundary_matrix(cells, n,G, use_cython=True):
-    if use_cython:
+def get_group_coboundary_matrix(cells, n,G, resolution='cython_bar'):
+    if resolution == 'cython_bar':
         return cython_fns.get_group_coboundary_matrix(cells,n,G)
+
+    mapped_cell_indices, mapping_parities = get_group_action_on_cells(cells,G,inverse=True)
+
+    if resolution != 'python_bar':
+        return resolution.dual_d_matrix(n, len(cells),
+                mapped_cell_indices, mapping_parities, raw=True)
 
     indexer_out = MultiIndexer(*( (G.size(),) * (n+1) + (len(cells),) ))
     indexer_in = MultiIndexer(*( (G.size(),) * n + (len(cells),) ))
@@ -433,7 +456,6 @@ def get_group_coboundary_matrix(cells, n,G, use_cython=True):
     A = sparse.dok_matrix((indexer_out.total_dim(), indexer_in.total_dim()), dtype=int)
     #A = matrix(base_ring, indexer_out.total_dim(), indexer_in.total_dim(), sparse=True)
 
-    mapped_cell_indices, mapping_parities = get_group_action_on_cells(cells,G,inverse=True)
 
     def build_index(ci_out, gi_out, ci_in, gi_in):
         return indexer_out(*( gi_out + (ci_out,))) , indexer_in(*( gi_in + (ci_in,)))
@@ -523,8 +545,8 @@ class ConvexComplex(object):
         acted_cell = cells[i].act_with(action)
         return cells.index(acted_cell)
 
-    def get_group_coboundary_matrix(self, n,G,k, use_cython=True):
-        return get_group_coboundary_matrix(self.cells[k],n,G, use_cython)
+    def get_group_coboundary_matrix(self, n,G,k, resolution='cython_bar'):
+        return get_group_coboundary_matrix(self.cells[k],n,G, resolution=resolution)
 
     def get_action_matrix(self, k, action):
         return ConvexComplex._get_action_matrix(self.cells[k], action)

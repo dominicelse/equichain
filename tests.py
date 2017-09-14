@@ -1,6 +1,7 @@
 import unittest
 from sage.all import *
 import chaincplx
+import chaincplx.resolutions
 import numpy
 import itertools
 
@@ -29,8 +30,10 @@ class ComplexWithGroupActionGenericTests(object):
         for k in xrange(len(self.cplx.cells)):
             for n in xrange(2):
                 D1 = self.cplx.get_group_coboundary_matrix(n=n,k=k,G=self.G,
-                        use_cython=True)
-                D2 = self.cplx.get_group_coboundary_matrix(n=n,k=k,G=self.G,use_cython=False)
+                        resolution='cython_bar')
+                D2 = self.cplx.get_group_coboundary_matrix(n=n,k=k,G=self.G,
+                        resolution=chaincplx.resolutions.BarResolution(self.G))
+                self.assertEqual(D1.shape, D2.shape)
                 self.assertEqual( (D1 != D2).nnz, 0 )
 
     def get_cocycle_soln(self,k,n,cell_index):

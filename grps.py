@@ -1,6 +1,7 @@
 from chaincplx.utils import *
 from chaincplx.sageutils import *
 from sage.all import *
+import itertools
 gap.load_package("Cryst")
 gap.SetCrystGroupDefaultAction(gap.LeftAction)
 
