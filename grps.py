@@ -100,6 +100,10 @@ class GapAffineQuotientGroup(object):
         #for i in len(self.els):
         #    for j in len(self.els):
 
+    def element_from_gap(self, gapg):
+        return GapAffineQuotientGroupElement(self.basegrp,
+                PermutationGroupElement(gapg))
+
     def subgroup(self, gens):
         G = GapAffineQuotientGroup.__new__(GapAffineQuotientGroup)
         G.sage_quotient_grp = self.sage_quotient_grp.subgroup([g.sageperm for g in gens])
@@ -118,8 +122,7 @@ class GapAffineQuotientGroup(object):
         return [GapAffineQuotientGroupElement(self.basegrp,g) for g in self.sage_quotient_grp.gens()]
 
     def elements(self):
-        return [GapAffineQuotientGroupElement(self.basegrp, g) for g in
-                self.sage_quotient_grp]
+        return [GapAffineQuotientGroupElement(self.basegrp, g) for g in self.sage_quotient_grp]
 
     def element_to_index(self, g):
         return self.els_reverse_lookup[g.sageperm]

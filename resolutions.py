@@ -1,6 +1,8 @@
 from scipy import sparse
 import chaincplx.utils as utils
 import itertools
+import functools
+from sage.all import *
 
 class FreeModuleSyllable(object):
     def __init__(self, m, g):
@@ -81,3 +83,75 @@ class BarResolution(ZGResolution):
     def __init__(self, G):
         super(BarResolution,self).__init__(G)
         self.G = G
+
+class HapResolution(ZGResolution):
+    def __init__(self,R,G):
+        self.R = HapResolutionThinWrapper(R) 
+        self.G = G
+        self.length = self.R.length()
+
+    def rank(self,k):
+        if not (k >= 0 and k <= self.length):
+            raise IndexError, k
+        return self.R.dimension(k)
+
+    def _compute_d_matrix_raw(self,k):
+        if not (k >= 1 and k <= self.length):
+            raise ValueError, "Bad k", k
+
+        d = utils.MatrixIndexingWrapper.from_factory(sparse.dok_matrix, int,
+                out_indexer = utils.MultiIndexer(self.G.size(), self.rank(k-1)),
+                in_indexer = utils.MultiIndexer(self.rank(k))
+                )
+
+        # precompute the map from "hap index" to the index corresponding to
+        # taking g.toindex()
+        elts = self.R.elts()
+        index_map = [ self.G.element_from_gap(g).toindex() for g in elts ]
+
+        for m in xrange(d.in_indexer.total_dim()):
+            acted_m = self.R.boundary(k, m+1)
+
+            for i, gi_hap in acted_m:
+                gi = index_map[ gi_hap-1 ]
+
+                assert i != 0
+                if i < 0:
+                    i = -i
+                    coeff = -1
+                else:
+                    coeff = 1
+
+                d[(gi,i-1), m] += coeff
+
+        return d.raw_access()
+
+class HapResolutionThinWrapper(object):
+    def __init__(self,R):
+        self.gap_fns = {}
+        self.R = R
+        for name in "dimension", "boundary", "homotopy", "elts", "group", "properties":
+            self.gap_fns[name] = gap("function(R) return R!." + name + "; end")
+
+        self.properties = self.gap_fns['properties'](R)
+
+    def dimension(self,k):
+        return self.gap_fns['dimension'](self.R)(k)
+
+    def boundary(self,k,j):
+        return self.gap_fns['boundary'](self.R)(k,j)
+
+    def homotopy(self, k,ig):
+        return self.gap_fns['homotopy'](self.R)(k,ig)
+
+    def elts(self):
+        return self.gap_fns['elts'](self.R)
+
+    def group(self):
+        return self.gap_fns['group'](self.R)
+
+    def length(self):
+        return self.properties['length']
+
+    def characteristic(self):
+        return self.properties['characteristic']
