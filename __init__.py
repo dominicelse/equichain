@@ -637,17 +637,47 @@ class NumpyEncoder(object):
                 self.sage_matrix_from_numpy(A).solve_right(
                     self.sage_vector_from_numpy(b) ) )
 
-class NumpyEncoderZN(NumpyEncoder):
-    def __init__(self, n):
-        self.field = Integers(n)
-        if not is_field(self.field):
-            raise ValueError, "Not sure if the code logic is correct if we're working in a field."
-        self.n = n
+    def matrix_passthrough(self, fn, A, *args, **kwargs):
+        A = self.sage_matrix_from_numpy(A)
+        ret = getattr(A, fn)(*args, **kwargs)
+        return self.sage_matrix_to_numpy(ret)
 
-    def sage_vector_from_numpy(self,a):
-        v = vector(a,self.field)
-        assert v.base_ring() == self.field
+class NumpyEncoderRingTemplate(NumpyEncoder):
+    def __init__(self, ring, numpy_dtype):
+        self.ring = ring
+        self.numpy_dtype = numpy_dtype
+
+    def sage_matrix_from_numpy(self,A):
+        return matrix(self.ring, A)
+
+    def sage_vector_from_numpy(self,A):
+        v = vector(a,self.ring)
+        assert v.base_ring() == self.ring
         return v
+
+    def sage_vector_to_numpy(self, a):
+        return numpy.array(a.numpy(dtype=self.numpy_dtype).flatten())
+
+    def sage_matrix_to_numpy(self, A):
+        return numpy.array(A.numpy(dtype=self.numpy_dtype))
+
+    def numpy_eye(self, n):
+        return numpy.eye(n, dtype=self.numpy_dtype)
+
+    def numpy_zeros(self, shape):
+        return numpy.zeros(shape, dtype=self.numpy_dtype)
+
+class NumpyEncoderZ(NumpyEncoderRingTemplate):
+    def __init__(self):
+        super(NumpyEncoderZ,self).__init__(ZZ, int)
+
+    def numpy_matrix_multiply(self, A,B):
+        return numpy.dot(A, B)
+
+
+class NumpyEncoderZN(NumpyEncoderRingTemplate):
+    def __init__(self, n):
+        super(NumpyEncoderZN,self).__init__(Integers(n), int)
 
     #def sage_matrix_from_numpy(self,A):
     #    return matrix(self.field, A)
@@ -661,25 +691,12 @@ class NumpyEncoderZN(NumpyEncoder):
         B.set_unsafe_from_numpy_int_array(A % self.n)
         return B
 
-    def sage_vector_to_numpy(self, a):
-        return numpy.array(a.numpy(dtype=int).flatten())
-
     def numpy_matrix_multiply(self, A,B):
         return numpy.dot(A, B) % self.n
-
-    def numpy_eye(self, n):
-        return numpy.eye(n, dtype=int)
-
-    def numpy_zeros(self, shape):
-        return numpy.zeros(shape, dtype=int)
-
-    def sage_matrix_to_numpy(self, A):
-        return numpy.array(A.numpy(dtype=int))
 
 class NumpyEncoderZ2(NumpyEncoderZN):
     def __init__(self):
         super(NumpyEncoderZ2,self).__init__(2)
-
 
 def get_numpy_encoder_Zn(n):
     if n == 2:
@@ -687,10 +704,11 @@ def get_numpy_encoder_Zn(n):
     elif n > 2:
         return NumpyEncoderZN(n)
 
-def column_space_intersection_with_other_space(B, other_space_basis_matrix, encoder):
-    Bsage = encoder.sage_matrix_from_numpy(B)
+def column_space_matrix(B,encoder):
+    return B[:,encoder.sage_matrix_from_numpy(B).pivots()]
 
-    W = numpy.bmat([[other_space_basis_matrix, -B[:,Bsage.pivots()]]])
+def column_space_intersection_with_other_space(B, other_space_basis_matrix, encoder):
+    W = numpy.bmat([[other_space_basis_matrix, -column_space_matrix(B,encoder)]])
     Wsage = encoder.sage_matrix_from_numpy(W)
     kernel_matrix = Wsage.right_kernel_matrix(basis='computed')
 
@@ -795,6 +813,30 @@ def trivialized_by_E3_but_not_E2(cplx,n,k,G,encoder):
 #        return B.image(nullspace)
 #    else:
 #        raise ValueError, "Undefined method."
+
+def group_cohomology(G,n, resolution, encoder):
+    d1 = get_group_coboundary_matrix([TrivialPermutee()], n, G, resolution)
+    d2 = get_group_coboundary_matrix([TrivialPermutee()], n-1, G, resolution)
+
+    return kernel_mod_image(d1.toarray(), d2.toarray(), encoder)
+
+def right_kernel_matrix(A,encoder):
+    return numpy.ascontiguousarray(encoder.matrix_passthrough('right_kernel_matrix', A, basis='computed').T)
+
+def kernel_mod_image(d1,d2,encoder):
+    # Returns the torsion coefficients of (ker d1)/(im d2), where d1 d2 = 0
+
+    #image = column_space_matrix(d2,encoder)
+    kernel = right_kernel_matrix(d1, encoder)
+
+    assert numpy.count_nonzero(encoder.numpy_matrix_multiply(d1, d2)) == 0
+
+    AB = numpy.bmat([[kernel,-d2]])
+    k2 = right_kernel_matrix(AB, encoder) 
+    alpha = k2[0:kernel.shape[1],:]
+    divisors = encoder.sage_matrix_from_numpy(alpha).elementary_divisors()
+
+    return [ divisor for divisor in divisors if divisor != 1 ]
 
 def trivialized_by_E2_space(cplx,n,k,G,encoder):
     d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G)
