@@ -86,8 +86,9 @@ class BarResolution(ZGResolution):
 
 class HapResolution(ZGResolution):
     def __init__(self,R,G):
+        super(HapResolution,self).__init__(G)
+
         self.R = HapResolutionThinWrapper(R) 
-        self.G = G
         self.length = self.R.length()
 
     def rank(self,k):
@@ -113,7 +114,7 @@ class HapResolution(ZGResolution):
             acted_m = self.R.boundary(k, m+1)
 
             for i, gi_hap in acted_m:
-                gi = index_map[ gi_hap-1 ]
+                gi = index_map[ int(gi_hap)-1 ]
 
                 assert i != 0
                 if i < 0:
@@ -122,7 +123,7 @@ class HapResolution(ZGResolution):
                 else:
                     coeff = 1
 
-                d[(gi,i-1), m] += coeff
+                d[(gi,i-1), (m,)] += coeff
 
         return d.raw_access()
 
@@ -133,10 +134,10 @@ class HapResolutionThinWrapper(object):
         for name in "dimension", "boundary", "homotopy", "elts", "group", "properties":
             self.gap_fns[name] = gap("function(R) return R!." + name + "; end")
 
-        self.properties = self.gap_fns['properties'](R)
+        self.properties = dict((str(k),v) for k,v in self.gap_fns['properties'](R))
 
     def dimension(self,k):
-        return self.gap_fns['dimension'](self.R)(k)
+        return int(self.gap_fns['dimension'](self.R)(k))
 
     def boundary(self,k,j):
         return self.gap_fns['boundary'](self.R)(k,j)
@@ -151,7 +152,7 @@ class HapResolutionThinWrapper(object):
         return self.gap_fns['group'](self.R)
 
     def length(self):
-        return self.properties['length']
+        return int(self.properties['length'])
 
     def characteristic(self):
         return self.properties['characteristic']

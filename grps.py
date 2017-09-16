@@ -102,7 +102,7 @@ class GapAffineQuotientGroup(object):
 
     def element_from_gap(self, gapg):
         return GapAffineQuotientGroupElement(self.basegrp,
-                PermutationGroupElement(gapg))
+                self.basegrp.sage_quotient_grp(gapg))
 
     def subgroup(self, gens):
         G = GapAffineQuotientGroup.__new__(GapAffineQuotientGroup)

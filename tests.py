@@ -170,7 +170,25 @@ def check_space_group(i, compute=True):
     except NotIntegerMatrixError:
         print "not integer:", i
 
+class GroupCohomologyTests(unittest.TestCase):
+    def setUp(self):
+        gap.load_package("hap")
 
+    def test_group_cohomology(self):
+        for i in range(2,18):
+            G = gap.SpaceGroupIT(2,i)
+
+            expected_answer=list(gap.GroupCohomology(gap.PointGroup(G),4))
+
+            Gq = chaincplx.GapAffineQuotientGroup(G,chaincplx.gap_space_group_translation_subgroup(G,1))
+            resolution = chaincplx.resolutions.HapResolution(
+                    gap.ResolutionFiniteGroup(Gq.gap_quotient_grp, 5),
+                    Gq)
+            answer=chaincplx.group_cohomology(Gq, 4,
+                    resolution=resolution,
+                    encoder=chaincplx.NumpyEncoderZ())
+
+            self.assertEqual(answer,expected_answer)
 
 class SpaceGroupTests(unittest.TestCase):
     def setUp(self):
