@@ -738,16 +738,21 @@ def image_of_constrained_subspace(A,B,encoder):
     if A.dtype != B.dtype:
         raise TypeError
 
-    AB = numpy.empty( (A.shape[0] + B.shape[0], A.shape[1]), A.dtype)
-    AB[0:A.shape[0],:] = A
-    AB[A.shape[0]:,:] = B
+    #AB = numpy.empty( (A.shape[0] + B.shape[0], A.shape[1]), A.dtype)
+    #AB[0:A.shape[0],:] = A
+    #AB[A.shape[0]:,:] = B
 
-    a = encoder.numpy_eye(A.shape[0])
-    b = encoder.numpy_zeros( (B.shape[0],A.shape[0]) )
-    target_space_basis = numpy.array(numpy.bmat([[a],
-                                                 [b]]))
-    return [ v[0:A.shape[0]] for v in column_space_intersection_with_other_space(AB, target_space_basis,
-                encoder) ]
+    #a = encoder.numpy_eye(A.shape[0])
+    #b = encoder.numpy_zeros( (B.shape[0],A.shape[0]) )
+    #target_space_basis = numpy.array(numpy.bmat([[a],
+    #                                             [b]]))
+    #return [ v[0:A.shape[0]] for v in column_space_intersection_with_other_space(AB, target_space_basis,
+    #            encoder) ]
+
+    K = right_kernel_matrix(B, encoder)
+    AK = encoder.numpy_matrix_multiply(A,K)
+    C = column_space_matrix(AK, encoder)
+    return [C[:,i].flat for i in xrange(C.shape[1])]
 
 def trivialized_by_E3_space(cplx,n,k,G,encoder):
     d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G)
