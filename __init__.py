@@ -677,6 +677,7 @@ class NumpyEncoderZ(NumpyEncoderRingTemplate):
 
 class NumpyEncoderZN(NumpyEncoderRingTemplate):
     def __init__(self, n):
+        self.n = n
         super(NumpyEncoderZN,self).__init__(Integers(n), int)
 
     #def sage_matrix_from_numpy(self,A):
@@ -687,7 +688,7 @@ class NumpyEncoderZN(NumpyEncoderRingTemplate):
             A = A.toarray()
 
         nrows,ncols = A.shape
-        B = matrix(self.field, nrows, ncols)
+        B = matrix(self.ring, nrows, ncols)
         B.set_unsafe_from_numpy_int_array(A % self.n)
         return B
 
