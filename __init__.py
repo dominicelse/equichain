@@ -651,7 +651,7 @@ class NumpyEncoderRingTemplate(NumpyEncoder):
         return matrix(self.ring, A)
 
     def sage_vector_from_numpy(self,A):
-        v = vector(a,self.ring)
+        v = vector(A,self.ring)
         assert v.base_ring() == self.ring
         return v
 
