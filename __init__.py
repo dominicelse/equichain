@@ -3,6 +3,7 @@ import itertools
 import numpy
 import sys
 import cProfile
+import time
 from scipy import sparse
 
 from chaincplx.utils import *
@@ -827,7 +828,13 @@ def group_cohomology(G,n, resolution, encoder):
     return kernel_mod_image(d1.toarray(), d2.toarray(), encoder)
 
 def right_kernel_matrix(A,encoder):
-    return numpy.ascontiguousarray(encoder.matrix_passthrough('right_kernel_matrix', A, basis='computed').T)
+    if isinstance(encoder, NumpyEncoderZ):
+        kwargs = dict(algorithm='flint')
+    else:
+        kwargs = dict()
+    ret = numpy.ascontiguousarray(encoder.matrix_passthrough('right_kernel_matrix', A,
+        basis='computed', **kwargs).T)
+    return ret
 
 def kernel_mod_image(d1,d2,encoder):
     # Returns the torsion coefficients of (ker d1)/(im d2), where d1 d2 = 0
