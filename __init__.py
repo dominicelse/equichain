@@ -590,9 +590,9 @@ class ConvexComplex(object):
     def get_chain_indexer(self,k,n,G):
         return ComplexChainIndexer(n=n,G=G,cells=self.cells[k])
 
-    def get_boundary_matrix_group_cochain(self, k,n,G):
+    def get_boundary_matrix_group_cochain(self, k,n,G, resolution):
         A = self.get_boundary_matrix(k)
-        return sparse.kron(A, sparse.eye(G.size()**n,dtype=int))
+        return sparse.kron(A, sparse.eye(resolution.rank(n),dtype=int))
 
     #def get_boundary_matrix_group_cochain_2(self, k,n,G):
     #    A = self.get_boundary_matrix(k)
@@ -675,6 +675,14 @@ class NumpyEncoderZ(NumpyEncoderRingTemplate):
     def numpy_matrix_multiply(self, A,B):
         return numpy.dot(A, B)
 
+    def sage_matrix_from_numpy(self,A):
+        if sparse.issparse(A):
+            A = A.toarray()
+
+        nrows,ncols = A.shape
+        B = matrix(self.ring, nrows, ncols)
+        B.set_unsafe_from_numpy_int_array(A)
+        return B
 
 class NumpyEncoderZN(NumpyEncoderRingTemplate):
     def __init__(self, n):
@@ -755,11 +763,11 @@ def image_of_constrained_subspace(A,B,encoder):
     C = column_space_matrix(AK, encoder)
     return [C[:,i].flat for i in xrange(C.shape[1])]
 
-def trivialized_by_E3_space(cplx,n,k,G,encoder):
-    d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G)
-    d2 = cplx.get_boundary_matrix_group_cochain(n=(n+1), k=(k+2), G=G)
-    delta1 = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G)
-    delta2 = cplx.get_group_coboundary_matrix(n=(n+1), k=(k+2), G=G)
+def trivialized_by_E3_space(cplx,n,k,G,encoder, resolution):
+    d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G, resolution=resolution)
+    d2 = cplx.get_boundary_matrix_group_cochain(n=(n+1), k=(k+2), G=G, resolution=resolution)
+    delta1 = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G, resolution=resolution)
+    delta2 = cplx.get_group_coboundary_matrix(n=(n+1), k=(k+2), G=G, resolution=resolution)
 
     z = encoder.numpy_zeros((d1.shape[0], delta2.shape[1]))
     A = numpy.bmat([[d1.toarray(),z]])
@@ -851,9 +859,9 @@ def kernel_mod_image(d1,d2,encoder):
 
     return [ divisor for divisor in divisors if divisor != 1 ]
 
-def trivialized_by_E2_space(cplx,n,k,G,encoder):
-    d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G)
-    delta1 = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G)
+def trivialized_by_E2_space(cplx,n,k,G,encoder,resolution):
+    d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G, resolution=resolution)
+    delta1 = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G, resolution=resolution)
 
     return image_of_constrained_subspace(d1.toarray(), delta1.toarray(), encoder)
 
