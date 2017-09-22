@@ -23,6 +23,9 @@ class ComplexWithGroupActionGenericTests(object):
                     with_midpoints=True)
             self.R = Integers(2)
             self.encoder = chaincplx.get_numpy_encoder_Zn(2)
+            #self.resolution = chaincplx.resolutions.HapResolution(
+            #        gap.ResolutionFiniteGroup(Gq.gap_quotient_grp, 3),
+            #        Gq)
         else:
             raise ValueError, "not valid chain complex description"
 
@@ -215,14 +218,20 @@ class SpaceGroupTests(unittest.TestCase):
 
             n=2
 
+            resolution = chaincplx.resolutions.HapResolution(
+                    gap.ResolutionFiniteGroup(Gq.gap_quotient_grp, 3),
+                    Gq)
+
             space = chaincplx.trivialized_by_E3_space(self.cplx,0,0,Gq,
-                        chaincplx.get_numpy_encoder_Zn(n=n))
+                        chaincplx.get_numpy_encoder_Zn(n=n),
+                        resolution=resolution)
 
             self.assertEqual(len(space), len(expected))
             self.assertTrue( all(numpy.array_equal(v,w) for v,w in itertools.izip(space, expected)))
 
             space = chaincplx.trivialized_by_E2_space(self.cplx,0,0,Gq,
-                        chaincplx.get_numpy_encoder_Zn(n=n))
+                        chaincplx.get_numpy_encoder_Zn(n=n),
+                        resolution=resolution)
 
             self.assertEqual(len(space), len(expected))
             self.assertTrue( all(numpy.array_equal(v,w) for v,w in itertools.izip(space, expected)))

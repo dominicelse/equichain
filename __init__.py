@@ -590,9 +590,13 @@ class ConvexComplex(object):
     def get_chain_indexer(self,k,n,G):
         return ComplexChainIndexer(n=n,G=G,cells=self.cells[k])
 
-    def get_boundary_matrix_group_cochain(self, k,n,G, resolution):
+    def get_boundary_matrix_group_cochain(self, k,n,G, resolution='cython_bar'):
         A = self.get_boundary_matrix(k)
-        return sparse.kron(A, sparse.eye(resolution.rank(n),dtype=int))
+        if resolution in ('cython_bar','python_bar'):
+            rank = G.size()**n
+        else:
+            rank = resolution.rank(n)
+        return sparse.kron(A, sparse.eye(rank,dtype=int))
 
     #def get_boundary_matrix_group_cochain_2(self, k,n,G):
     #    A = self.get_boundary_matrix(k)
