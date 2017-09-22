@@ -291,7 +291,7 @@ def cubical_cell_boundary(ndims, basepoint_coords, direction, orientation,
     return FormalIntegerSum(coeffs)
 
 def _cubical_complex_base(ndims, extents, universe, with_midpoints, scale, pointclass):
-    cplx = ConvexComplex(ndims)
+    cplx = CellComplex(ndims)
     for celldim in xrange(ndims+1):
         for direction in itertools.combinations(xrange(ndims),celldim):
             coord_ranges = [ xrange(extents[i][0], extents[i][1], scale) for i in xrange(ndims) ]
@@ -514,13 +514,13 @@ def get_group_action_on_cells(cells, G, inverse=False):
 
     return mapped_cell_indices, mapping_parities
 
-class ConvexComplex(object):
+class CellComplex(object):
     @staticmethod
     def _get_action_matrix(cells,action):
         cells = list(cells)
         A = numpy.zeros( (len(cells), len(cells)), dtype=int)
         for i in xrange(len(cells)):
-            j = ConvexComplex._get_action_on_cell_index(cells,i,action)
+            j = CellComplex._get_action_on_cell_index(cells,i,action)
             A[j,i] = get_relative_orientation(acted_cell.orientation(), cells[j].orientation())
         return A
 
@@ -550,7 +550,7 @@ class ConvexComplex(object):
         return get_group_coboundary_matrix(self.cells[k],n,G, resolution=resolution)
 
     def get_action_matrix(self, k, action):
-        return ConvexComplex._get_action_matrix(self.cells[k], action)
+        return CellComplex._get_action_matrix(self.cells[k], action)
 
     def get_group_orbits(self, k, G):
         cells = self.cells[k]
