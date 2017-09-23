@@ -2,7 +2,6 @@ from chaincplx.utils import *
 from chaincplx.sageutils import *
 from sage.all import *
 import itertools
-import numpy.matlib
 gap.load_package("Cryst")
 gap.SetCrystGroupDefaultAction(gap.LeftAction)
 
@@ -314,33 +313,6 @@ def affine_transformation_rescale(A,scale):
     A[0:d,d] *= scale
     return A
 
-def translation_generators_sage(d):
-    for i in xrange(d):
-        A = matrix(ZZ, d+1,d+1)
-        A[i,d] = 1
-        for j in xrange(d+1):
-            A[j,j] = 1
-        yield A
-
-def translation_generators_numpy(d, scale=1, with_inverses=False):
-    for i in xrange(d):
-        A = numpy.matlib.eye(d+1)
-        A[i,d] = scale
-        yield A
-
-    if with_inverses:
-        for i in xrange(d):
-            A = numpy.matlib.eye(d+1)
-            A[i,d] = -scale
-            yield A
-
-def affine_transformation_from_translation_vector_sage(v):
-    d = len(v)
-    A = matrix(ZZ, n+1, n+1)
-    for i in xrange(d):
-        A[i,i] = 1
-    A[0:d,d] = v
-    return A
 
 #def toroidal_space_group(d,n,L):
 #    G = gap.SpaceGroupIT(d,n)

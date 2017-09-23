@@ -2,16 +2,11 @@ import copy
 import numpy
 from scipy import sparse
 import itertools
-from functools import reduce
-import operator
 
 def powerset(iterable):
     "powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"
     s = list(iterable)
     return itertools.chain.from_iterable(itertools.combinations(s, r) for r in range(len(s)+1))
-
-def product(factors, starting=1):
-    return reduce(operator.mul, factors, starting)
 
 def selection_sort_with_parity(l):
     l = list(l)
