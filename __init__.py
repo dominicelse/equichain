@@ -148,13 +148,16 @@ class ConvexHullCell(object):
         self.original_my_hash = ConvexHullCell.__hash__(self)
 
     def act_with(self,action):
-        ret = ConvexHullCell([p.act_with(action) for p in list(self)],
+        ret = ConvexHullCell([p.act_with(action) for p in self.points],
                 orientation=transform_levi_civita(self._orientation,action))
 
         return ret
 
     def __eq__(a,b):
         return a.points == b.points
+
+    def __ne__(a,b):
+        return not a == b
 
     def __hash__(self):
         h = hash(self.points)
