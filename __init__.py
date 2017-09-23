@@ -275,8 +275,8 @@ def reduce_projected_levi_civita(E, normal_vector):
 
 def transform_levi_civita(E, R):
     if isinstance(R,MatrixQuotientGroupElement):
-        R = R.as_matrix_representative()
-    Rt = numpy.transpose(R.numpy())[0:-1,0:-1]
+        R = R.as_matrix_representative().numpy()
+    Rt = numpy.transpose(R)[0:-1,0:-1]
     for i in xrange(len(E.shape)):
         E = numpy.tensordot(E, Rt, (0,0))
     return E
