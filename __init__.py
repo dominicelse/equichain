@@ -110,12 +110,13 @@ class Universe(object):
 
     def contains_cell(self, cell, include_boundary):
         if self.cell_outside(cell):
-            return False
+            ret = False
         else:
             if include_boundary:
-                return True
+                ret = True
             else:
-                return not self.cell_on_boundary(self,cell)
+                ret = not self.cell_on_boundary(cell)
+        return ret
 
 class FiniteCubicUniverse(Universe):
     def __init__(self, extents, uncompactified_dirs):
@@ -394,7 +395,8 @@ def _cubical_complex_base(ndims, extents, universe, with_midpoints, scale,
     cplx = CellComplex(ndims)
     for celldim in xrange(ndims+1):
         for direction in itertools.combinations(xrange(ndims),celldim):
-            coord_ranges = [ xrange(extents[i][0], extents[i][1] + 1, scale) for i in xrange(ndims) ]
+            coord_ranges = [ xrange(extents[i][0], extents[i][1] + 
+                (1 if i in universe.uncompactified_dirs else 0), scale) for i in xrange(ndims) ]
             for coord in itertools.product(*coord_ranges):
                 cell = cubical_cell(celldim,coord,direction,
                         universe, with_midpoints, scale, pointclass)
@@ -427,7 +429,7 @@ def cubical_complex(ndims, sizes, open_dirs=[], with_midpoints=False, scale=1,
     extents = [ [-sizes[i]*scale,sizes[i]*scale] for i in xrange(ndims) ]
     universe = FiniteCubicUniverse(extents, open_dirs)
     return _cubical_complex_base(ndims, extents, universe,
-            with_midpoints,scale,pointclass)
+            with_midpoints,scale,include_boundary_cells,pointclass)
 
 def torus_minimal_barycentric_subdivision(ndims):
     scale = 2
@@ -741,6 +743,7 @@ class CellComplex(object):
         cells = self.cells[k]
         cell_indices = set(xrange(len(cells)))
 
+        
         orbits = []
 
         while len(cell_indices) > 0:
