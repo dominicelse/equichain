@@ -645,9 +645,12 @@ class CellComplex(object):
 
     #    return AG
 
-    def add_cell(self, ndim, cell, boundary):
+    def add_cell(self, ndim, cell, boundary=None):
         self.cells[ndim] += [cell]
-        self.boundary_data[cell] = boundary
+        if boundary is None:
+            self.boundary_data[cell] = cell.boundary()
+        else:
+            self.boundary_data[cell] = boundary
 
     def __init__(self,ndims):
         self.ndims = ndims
