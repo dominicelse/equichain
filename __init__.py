@@ -429,6 +429,24 @@ def cubical_complex(ndims, sizes, open_dirs=[], with_midpoints=False, scale=1,
     return _cubical_complex_base(ndims, extents, universe,
             with_midpoints,scale,pointclass)
 
+def torus_minimal_barycentric_subdivision(ndims):
+    scale = 2
+    extents = [[0,scale]]*ndims
+    universe = FiniteCubicUniverse(extents, range(ndims))
+    pointclass = IntegerPointInUniverse
+
+    c = _cubical_complex_base(ndims, extents, universe, with_midpoints=True,
+            scale=scale, include_boundary_cells=True, pointclass=pointclass)
+    #return c
+
+    c2 = c.barycentric_subdivision()
+    #return c2
+
+    gens = list(translation_generators_numpy(ndims,scale=scale,with_inverses=True))
+    equiv_relation = EquivalenceRelationFromCommutingActionGenerators(gens,
+            c2.all_cells_iterator(), reduce_order=1)
+    return c2.quotient(equiv_relation)
+
 def get_stabilizer_group(cell,G):
     gs = [g for g in G if cell.act_with(g) == cell]
     try:
