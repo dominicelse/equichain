@@ -161,15 +161,23 @@ class FlatUniverse(Universe):
 class ConvexHullCell(object):
     def __init__(self,points,orientation):
         # The orientation is an anti-symmetric matrix implementing the
-        # projected determinant.
+        # projected determinant. Pass None for an unoriented cell.
         self.points = frozenset(points)
         self._orientation = orientation
         self.original_my_hash = None
         self.original_my_hash = ConvexHullCell.__hash__(self)
 
+    def forget_orientation(self):
+        return ConvexHullCell(self.points, None)
+
     def act_with(self,action):
+        if self._orientation is None:
+            new_orientation = None
+        else:
+            new_orientation = transform_levi_civita(self._orientation,action)
+
         ret = ConvexHullCell([p.act_with(action) for p in self.points],
-                orientation=transform_levi_civita(self._orientation,action))
+                orientation=new_orientation)
 
         return ret
 
@@ -210,6 +218,9 @@ class ConvexHullCellWithMidpoint(ConvexHullCell):
     def forget_midpoint(self):
         return ConvexHullCell(self.points,self.orientation)
 
+    def forget_orientation(self):
+        return ConvexHullCellWithMidpoint(self.points, None, self.midpoint)
+
     def __hash__(self):
         return super(ConvexHullCellWithMidpoint,self).__hash__() ^ hash(self.midpoint)
 
@@ -238,6 +249,10 @@ class QuotientCell(object):
 
     def __hash__(self):
         return self.equivalence_relation.hash_equivalence_class(self.representative_cell)
+
+    def act_with(self, action):
+        return QuotientCell(self.representative_cell.act_with(action),
+                self.equivalence_relation)
 
     def boundary(self):
         return FormalIntegerSum( dict( (QuotientCell(k,self.equivalence_relation),v) for k,v in
@@ -355,6 +370,12 @@ def transform_levi_civita(E, R):
     for i in xrange(len(E.shape)):
         E = numpy.tensordot(E, Rt, (0,0))
     return E
+
+def get_relative_orientation_cells(cell1, cell2):
+    if isinstance(cell1, ConvexHullCell):
+        return get_relative_orientation(cell1.orientation(),cell2.orientation())
+    else:
+        return 1
 
 def get_relative_orientation(orientation1, orientation2):
     if numpy.array_equal(orientation1,orientation2):
@@ -621,8 +642,7 @@ def get_action_on_cells(cells,action):
             acted_ci = cells.index(acted_cell)
         except ValueError:
             raise ComplexNotInvariantError
-        parity = get_relative_orientation(cells[acted_ci].orientation(),
-                cells[acted_ci].orientation())
+        parity = get_relative_orientation_cells(acted_cell, cells[acted_ci])
 
         mapped_cell_indices[i] = acted_ci
         mapping_parities[i] = parity
@@ -682,19 +702,24 @@ class OrderedSimplex(object):
         return "SIMPLEX" + str(self.vertices)
 
 class CellComplex(object):
-    @staticmethod
-    def _get_action_matrix(cells,action):
-        cells = list(cells)
-        A = numpy.zeros( (len(cells), len(cells)), dtype=int)
-        for i in xrange(len(cells)):
-            j = CellComplex._get_action_on_cell_index(cells,i,action)
-            A[j,i] = get_relative_orientation(acted_cell.orientation(), cells[j].orientation())
-        return A
+    #@staticmethod
+    #def _get_action_matrix(cells,action):
+    #    cells = list(cells)
+    #    A = numpy.zeros( (len(cells), len(cells)), dtype=int)
+    #    for i in xrange(len(cells)):
+    #        j = CellComplex._get_action_on_cell_index(cells,i,action)
+    #        A[j,i] = get_relative_orientation(acted_cell.orientation(), cells[j].orientation())
+    #    return A
 
     def all_cells_iterator(self):
         for cells_k in self.cells:
             for cell in cells_k:
                 yield cell
+
+    def _all_cells_iterator_unoriented(self):
+        for cells_k in self.cells:
+            for cell in cells_k:
+                yield cell.forget_orientation()
 
     def quotient(self, equiv_relation):
         cplx = CellComplex(self.ndims)
@@ -706,20 +731,20 @@ class CellComplex(object):
 
         return cplx
 
-    def _all_contained_cells_iterator(self, cell):
+    def _all_contained_cells_iterator_unoriented(self, cell):
         for boundary_cell in self.boundary_data[cell].coeffs.keys():
-            yield boundary_cell
-            for c in self._all_contained_cells_iterator(boundary_cell):
+            yield boundary_cell.forget_orientation()
+            for c in self._all_contained_cells_iterator_unoriented(boundary_cell):
                 yield c
 
     def _barycentric_word_iterator(self, base_cell=None):
         if base_cell is None:
-            for cell in self.all_cells_iterator():
+            for cell in self._all_cells_iterator_unoriented():
                 for word in self._barycentric_word_iterator(cell):
                     yield word
         else:
             yield (base_cell,)
-            for cell in self._all_contained_cells_iterator(base_cell):
+            for cell in self._all_contained_cells_iterator_unoriented(base_cell):
                 for word in self._barycentric_word_iterator(cell):
                     yield word + (base_cell,)
 
@@ -736,8 +761,8 @@ class CellComplex(object):
     def get_group_coboundary_matrix(self, n,G,k, resolution='cython_bar'):
         return get_group_coboundary_matrix(self.cells[k],n,G, resolution=resolution)
 
-    def get_action_matrix(self, k, action):
-        return CellComplex._get_action_matrix(self.cells[k], action)
+    #def get_action_matrix(self, k, action):
+    #    return CellComplex._get_action_matrix(self.cells[k], action)
 
     def get_group_orbits(self, k, G):
         cells = self.cells[k]
