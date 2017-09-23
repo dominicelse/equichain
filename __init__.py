@@ -676,11 +676,13 @@ class CellComplex(object):
             for cell in cells_k:
                 yield cell
 
-    #    A = numpy.zeros( (G.size(), len(cells), len(cells)), dtype=int)
+    def quotient(self, equiv_relation):
+        cplx = CellComplex(self.ndims)
 
-    #    for ci in xrange(len(cells)):
-    #        for g in G:
-    #            gi = g.toindex()
+        for k in xrange(self.ndims+1):
+            quotient_cells = set(QuotientCell(cell,equiv_relation) for cell in self.cells[k])
+            for q in quotient_cells:
+                cplx.add_cell(k, q)
 
         return cplx
 
