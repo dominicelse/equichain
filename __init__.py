@@ -105,15 +105,27 @@ class Universe(object):
     def cell_on_boundary(self, cell):
         return all(not self.point_in_interior(pt) for pt in cell)
 
-class OpenToroidalUniverse(Universe):
-    def __init__(self, extents, open_dirs):
+    def cell_outside(self, cell):
+        return any(self.point_outside(pt) for pt in cell)
+
+    def contains_cell(self, cell, include_boundary):
+        if self.cell_outside(cell):
+            return False
+        else:
+            if include_boundary:
+                return True
+            else:
+                return not self.cell_on_boundary(self,cell)
+
+class FiniteCubicUniverse(Universe):
+    def __init__(self, extents, uncompactified_dirs):
         self.extents = extents
-        self.open_dirs = open_dirs
+        self.uncompactified_dirs = uncompactified_dirs
 
     def canonicalize_coords(self, coords):
         coords = list(QQ(c) for c in coords)
         for i in xrange(len(self.extents)):
-            if i not in self.open_dirs:
+            if i not in self.uncompactified_dirs:
                 coords[i] = (fracpart((coords[i]-self.extents[i][0]) / (self.extents[i][1] - self.extents[i][0]))
                         * (self.extents[i][1] - self.extents[i][0])
                         + self.extents[i][0])
@@ -123,16 +135,23 @@ class OpenToroidalUniverse(Universe):
         assert len(coords) == len(self.extents)
         coords = numpy.array(coords, dtype=int)
         for i in xrange(len(self.extents)):
-            if i not in self.open_dirs:
+            if i not in self.uncompactified_dirs:
                 coords[i] = (coords[i] - self.extents[i][0]) % (self.extents[i][1] - self.extents[i][0]) + self.extents[i][0]
         return coords
 
     def point_in_interior(self, point):
         for d in xrange(len(self.extents)):
-            if d in self.open_dirs:
+            if d in self.uncompactified_dirs:
                 if point.coords[d] <= self.extents[d][0] or point.coords[d] >= self.extents[d][1]:
                     return False
         return True
+
+    def point_outside(self, point):
+        for d in xrange(len(self.extents)):
+            if d in self.uncompactified_dirs:
+                if point.coords[d] < self.extents[d][0] or point.coords[d] > self.extents[d][1]:
+                    return True
+        return False
 
 class FlatUniverse(Universe):
     def canonicalize_coords(self, coords):
