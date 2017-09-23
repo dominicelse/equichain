@@ -290,7 +290,7 @@ def get_relative_orientation(orientation1, orientation2):
         raise RuntimeError, "Orientations are not relative."
 
 def cubical_cell_boundary(ndims, basepoint_coords, direction, orientation,
-        universe, with_midpoints, scale, pointclass):
+        universe, with_midpoints, scale, include_boundary_cells, pointclass):
     coeffs = {}
     for face_direction in direction:
         normal_vector = numpy.zeros(shape=(len(basepoint_coords),),dtype=int)
@@ -299,7 +299,7 @@ def cubical_cell_boundary(ndims, basepoint_coords, direction, orientation,
 
         cell = cubical_cell(ndims-1, basepoint_coords, remaining_directions,
                 universe, with_midpoints, scale, pointclass)
-        if not universe.cell_on_boundary(cell):
+        if universe.contains_cell(cell, include_boundary_cells):
             reduced_orientation = reduce_projected_levi_civita(orientation, normal_vector)
             coeffs[cell] = get_relative_orientation(reduced_orientation,
                     cell.orientation())
@@ -308,32 +308,40 @@ def cubical_cell_boundary(ndims, basepoint_coords, direction, orientation,
         coord[face_direction] += scale
         cell = cubical_cell(ndims-1, coord, remaining_directions, universe,
                 with_midpoints, scale, pointclass)
-        if not universe.cell_on_boundary(cell):
+        if universe.contains_cell(cell, include_boundary_cells):
             reduced_orientation = reduce_projected_levi_civita(orientation, -normal_vector)
             coeffs[cell] = get_relative_orientation(reduced_orientation,
                     cell.orientation())
 
     return FormalIntegerSum(coeffs)
 
-def _cubical_complex_base(ndims, extents, universe, with_midpoints, scale, pointclass):
+def _cubical_complex_base(ndims, extents, universe, with_midpoints, scale,
+        include_boundary_cells=False, pointclass=PointInUniverse):
     cplx = CellComplex(ndims)
     for celldim in xrange(ndims+1):
         for direction in itertools.combinations(xrange(ndims),celldim):
-            coord_ranges = [ xrange(extents[i][0], extents[i][1], scale) for i in xrange(ndims) ]
+            coord_ranges = [ xrange(extents[i][0], extents[i][1] + 1, scale) for i in xrange(ndims) ]
             for coord in itertools.product(*coord_ranges):
                 cell = cubical_cell(celldim,coord,direction,
                         universe, with_midpoints, scale, pointclass)
-                if not universe.cell_on_boundary(cell):
+                if universe.contains_cell(cell, include_boundary_cells):
                     cplx.add_cell(celldim,
                             cell,
                             cubical_cell_boundary(celldim,coord,direction,
                                 cell.orientation(), universe,
-                                with_midpoints,scale,
+                                with_midpoints,scale,include_boundary_cells,
                                 pointclass)
                             )
     return cplx
 
-def cubical_complex(ndims, sizes, open_dirs, with_midpoints=False, scale=1,
+#def minimal_complex_torus(ndims,scale=1,pointclass=PointInUniverse):
+#    extents = [ [0,scale] ]*ndims
+#    return _cubical_complex_base(ndims, 
+#            [ [0,scale] ]*ndims, FiniteCubicUniverse(extents, []),
+#            with_midpoints=True, scale=scale, pointclass=pointclass)
+
+def cubical_complex(ndims, sizes, open_dirs=[], with_midpoints=False, scale=1,
+        include_boundary_cells=False,
         pointclass=PointInUniverse):
     assert len(sizes) == ndims
     assert all(d >= 0 and d < ndims for d in open_dirs)
@@ -343,7 +351,7 @@ def cubical_complex(ndims, sizes, open_dirs, with_midpoints=False, scale=1,
             raise ValueError, "Don't use this function to construct a compactified direction of length <= 2 without setting with_midpoints=True, this causes problems."
 
     extents = [ [-sizes[i]*scale,sizes[i]*scale] for i in xrange(ndims) ]
-    universe = OpenToroidalUniverse(extents, open_dirs)
+    universe = FiniteCubicUniverse(extents, open_dirs)
     return _cubical_complex_base(ndims, extents, universe,
             with_midpoints,scale,pointclass)
 
