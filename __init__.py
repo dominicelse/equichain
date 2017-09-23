@@ -67,7 +67,7 @@ class IntegerPointInUniverse(object):
         self.universe = universe
         self.coords = universe.canonicalize_coords_int(coords)
         self.coords.setflags(write=False)
-
+        
     def __hash__(self):
         return hash(self.coords.data)
 
@@ -89,6 +89,9 @@ class IntegerPointInUniverse(object):
     def act_with(self, action):
         if isinstance(action, MatrixQuotientGroupElement):
             action = action.as_matrix_representative_numpy_int()
+
+        if isinstance(action, numpy.matrix):
+            action = numpy.array(action)
 
         v = numpy.empty(len(self.coords)+1, dtype=int)
         v[0:-1] = self.coords
