@@ -621,6 +621,46 @@ def get_group_action_on_cells(cells, G, inverse=False):
 
     return mapped_cell_indices, mapping_parities
 
+class OrderedSimplex(object):
+    """ This class represents a (combinatorial) simplex, i.e. a tuple of
+    vertices (v_1, ... , v_n). Note that it is assumed that there is a partial
+    ordering on vertices and that the vertices are input such that v_1 < v_2 <
+    v_3 < ... < v_n. This ordering must also be preserved under action on the
+    vertices. """
+
+    def __init__(self, vertices):
+        self.vertices = tuple(vertices)
+
+    def __eq__(a,b):
+        return a.vertices == b.vertices
+
+    def __ne__(a,b):
+        return a.vertices != b.vertices
+
+    def __hash__(self):
+        return hash(self.vertices)
+
+    def boundary(self):
+        n = len(self.vertices)
+        if n == 1:
+            return FormalIntegerSum({})
+
+        coeffs = {}
+        for i in xrange(n):
+            reduced_word = self.vertices[0:i] + self.vertices[(i+1):]
+            coeffs[OrderedSimplex(reduced_word)] = (-1)**i
+
+        return FormalIntegerSum(coeffs)
+
+    def act_with(self,action):
+        return OrderedSimplex(v.act_with(action) for v in self.vertices)
+
+    def __str__(self):
+        return repr(self)
+
+    def __repr__(self):
+        return "SIMPLEX" + str(self.vertices)
+
 class CellComplex(object):
     @staticmethod
     def _get_action_matrix(cells,action):
@@ -631,8 +671,10 @@ class CellComplex(object):
             A[j,i] = get_relative_orientation(acted_cell.orientation(), cells[j].orientation())
         return A
 
-    #def get_first_group_coboundary_matrix(self, G, k):
-    #    cells = self.cells[k]
+    def all_cells_iterator(self):
+        for cells_k in self.cells:
+            for cell in cells_k:
+                yield cell
 
     #    A = numpy.zeros( (G.size(), len(cells), len(cells)), dtype=int)
 
@@ -640,15 +682,31 @@ class CellComplex(object):
     #        for g in G:
     #            gi = g.toindex()
 
-    #            acted_cell = cells[ci].act_with( (g**(-1)).as_matrix_representative() )
-    #            acted_ci = cells.index(acted_cell)
-    #            parity = get_relative_orientation(acted_cell.orientation, cells[acted_ci].orientation) 
+        return cplx
 
-    #            A[gi,ci,acted_ci] += parity
-    #            A[gi,ci,ci] += -1
+    def _all_contained_cells_iterator(self, cell):
+        for boundary_cell in self.boundary_data[cell].coeffs.keys():
+            yield boundary_cell
+            for c in self._all_contained_cells_iterator(boundary_cell):
+                yield c
 
-    #    return numpy.reshape(A, (G.size()*len(cells), len(cells)))
-    
+    def _barycentric_word_iterator(self, base_cell=None):
+        if base_cell is None:
+            for cell in self.all_cells_iterator():
+                for word in self._barycentric_word_iterator(cell):
+                    yield word
+        else:
+            yield (base_cell,)
+            for cell in self._all_contained_cells_iterator(base_cell):
+                for word in self._barycentric_word_iterator(cell):
+                    yield word + (base_cell,)
+
+    def barycentric_subdivision(self):
+        cplx = CellComplex(self.ndims)
+        for word in self._barycentric_word_iterator():
+            cplx.add_cell(len(word)-1, OrderedSimplex(word))
+        return cplx
+
     def _get_action_on_cell_index(self,cells,action,i):
         acted_cell = cells[i].act_with(action)
         return cells.index(acted_cell)
