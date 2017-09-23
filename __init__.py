@@ -67,6 +67,9 @@ class IntegerPointInUniverse(object):
         self.universe = universe
         self.coords = universe.canonicalize_coords_int(coords)
         self.coords.setflags(write=False)
+        
+    def homo_into_universe(self, new_universe):
+        return IntegerPointInUniverse(new_universe, self.coords)
 
     def __hash__(self):
         return hash(self.coords.data)
@@ -90,6 +93,9 @@ class IntegerPointInUniverse(object):
         if isinstance(action, MatrixQuotientGroupElement):
             action = action.as_matrix_representative_numpy_int()
 
+        if isinstance(action, numpy.matrix):
+            action = numpy.array(action)
+
         v = numpy.empty(len(self.coords)+1, dtype=int)
         v[0:-1] = self.coords
         v[-1] = 1
@@ -102,15 +108,27 @@ class Universe(object):
     def cell_on_boundary(self, cell):
         return all(not self.point_in_interior(pt) for pt in cell)
 
-class OpenToroidalUniverse(Universe):
-    def __init__(self, extents, open_dirs):
+    def cell_outside(self, cell):
+        return any(self.point_outside(pt) for pt in cell)
+
+    def contains_cell(self, cell, include_boundary):
+        if self.cell_outside(cell):
+            return False
+        else:
+            if include_boundary:
+                return True
+            else:
+                return not self.cell_on_boundary(self,cell)
+
+class FiniteCubicUniverse(Universe):
+    def __init__(self, extents, uncompactified_dirs):
         self.extents = extents
-        self.open_dirs = open_dirs
+        self.uncompactified_dirs = uncompactified_dirs
 
     def canonicalize_coords(self, coords):
         coords = list(QQ(c) for c in coords)
         for i in xrange(len(self.extents)):
-            if i not in self.open_dirs:
+            if i not in self.uncompactified_dirs:
                 coords[i] = (fracpart((coords[i]-self.extents[i][0]) / (self.extents[i][1] - self.extents[i][0]))
                         * (self.extents[i][1] - self.extents[i][0])
                         + self.extents[i][0])
@@ -120,16 +138,23 @@ class OpenToroidalUniverse(Universe):
         assert len(coords) == len(self.extents)
         coords = numpy.array(coords, dtype=int)
         for i in xrange(len(self.extents)):
-            if i not in self.open_dirs:
+            if i not in self.uncompactified_dirs:
                 coords[i] = (coords[i] - self.extents[i][0]) % (self.extents[i][1] - self.extents[i][0]) + self.extents[i][0]
         return coords
 
     def point_in_interior(self, point):
         for d in xrange(len(self.extents)):
-            if d in self.open_dirs:
+            if d in self.uncompactified_dirs:
                 if point.coords[d] <= self.extents[d][0] or point.coords[d] >= self.extents[d][1]:
                     return False
         return True
+
+    def point_outside(self, point):
+        for d in xrange(len(self.extents)):
+            if d in self.uncompactified_dirs:
+                if point.coords[d] < self.extents[d][0] or point.coords[d] > self.extents[d][1]:
+                    return True
+        return False
 
 class FlatUniverse(Universe):
     def canonicalize_coords(self, coords):
@@ -145,13 +170,16 @@ class ConvexHullCell(object):
         self.original_my_hash = ConvexHullCell.__hash__(self)
 
     def act_with(self,action):
-        ret = ConvexHullCell([p.act_with(action) for p in list(self)],
+        ret = ConvexHullCell([p.act_with(action) for p in self.points],
                 orientation=transform_levi_civita(self._orientation,action))
 
         return ret
 
     def __eq__(a,b):
         return a.points == b.points
+
+    def __ne__(a,b):
+        return not a == b
 
     def __hash__(self):
         h = hash(self.points)
@@ -199,6 +227,80 @@ class ConvexHullCellWithMidpoint(ConvexHullCell):
     def __repr__(self):
         return str(self)
 
+class QuotientCell(object):
+    def __init__(self, representative_cell, equivalence_relation):
+        self.representative_cell = representative_cell
+        self.equivalence_relation = equivalence_relation
+
+    def __eq__(a,b):
+        return a.equivalence_relation.are_equivalent(a.representative_cell, b.representative_cell)
+
+    def __ne__(a,b):
+        return not a == b
+
+    def __hash__(self):
+        return self.equivalence_relation.hash_equivalence_class(self.representative_cell)
+
+    def boundary(self):
+        return FormalIntegerSum( dict( (QuotientCell(k,self.equivalence_relation),v) for k,v in
+                self.representative_cell.boundary().coeffs.iteritems() ) )
+
+    def __str__(self):
+        return repr(self)
+
+    def __repr__(self):
+        return "QUOTIENT:" + str(self.representative_cell)
+
+class EquivalenceRelationFromCommutingActionGenerators(object):
+    def __init__(self, gens, representatives, default_max_order=5, reduce_order=None):
+        self.gens = gens
+        self.default_max_order = default_max_order
+
+        # If reduce_order is not None, then the set of representatives might be
+        # overcomplete, and we try to reduce it (but we only look for
+        # relations generated by powers <= reduce_order.)
+        if reduce_order is not None:
+            self.map_to_representatives = {}
+            self.representatives = set()
+
+            for cell in representatives:
+                if not self.canonical_representative(cell,max_order=reduce_order,return_bool=True):
+                    self.representatives.add(cell)
+                    self.map_to_representatives[cell] = cell
+        else:
+            self.map_to_representatives = dict( (cell,cell) for cell in
+                    representatives )
+            self.representatives = frozenset(representatives)
+
+    def canonical_representative(self,cell, max_order=None, return_bool=False):
+        if cell in self.map_to_representatives:
+            return self.map_to_representatives[cell]
+
+        if max_order is None:
+            max_order = self.default_max_order
+
+        for morder in xrange(max_order+1):
+            for k in itertools.product(range(morder+1), repeat=len(self.gens)):
+                g = product( (self.gens[i]**k[i] for i in xrange(1,len(self.gens))),
+                        self.gens[0]**k[0] )
+                acted_cell = cell.act_with(g)
+                if acted_cell in self.representatives:
+                    self.map_to_representatives[cell] = acted_cell
+                    if return_bool:
+                        return True
+                    else:
+                        return acted_cell
+
+        if return_bool:
+            return False
+        else:
+            raise ValueError, "Cell doesn't appear to have a representative."
+
+    def are_equivalent(self, cell1, cell2):
+        return self.canonical_representative(cell1) == self.canonical_representative(cell2)
+
+    def hash_equivalence_class(self, cell):
+        return hash(self.canonical_representative(cell))
 
 def cubical_cell(ndims, basepoint_coords, direction, universe, with_midpoint,
         scale, pointclass):
@@ -250,8 +352,8 @@ def reduce_projected_levi_civita(E, normal_vector):
 
 def transform_levi_civita(E, R):
     if isinstance(R,MatrixQuotientGroupElement):
-        R = R.as_matrix_representative()
-    Rt = numpy.transpose(R.numpy())[0:-1,0:-1]
+        R = R.as_matrix_representative().numpy()
+    Rt = numpy.transpose(R)[0:-1,0:-1]
     for i in xrange(len(E.shape)):
         E = numpy.tensordot(E, Rt, (0,0))
     return E
@@ -265,7 +367,7 @@ def get_relative_orientation(orientation1, orientation2):
         raise RuntimeError, "Orientations are not relative."
 
 def cubical_cell_boundary(ndims, basepoint_coords, direction, orientation,
-        universe, with_midpoints, scale, pointclass):
+        universe, with_midpoints, scale, include_boundary_cells, pointclass):
     coeffs = {}
     for face_direction in direction:
         normal_vector = numpy.zeros(shape=(len(basepoint_coords),),dtype=int)
@@ -274,7 +376,7 @@ def cubical_cell_boundary(ndims, basepoint_coords, direction, orientation,
 
         cell = cubical_cell(ndims-1, basepoint_coords, remaining_directions,
                 universe, with_midpoints, scale, pointclass)
-        if not universe.cell_on_boundary(cell):
+        if universe.contains_cell(cell, include_boundary_cells):
             reduced_orientation = reduce_projected_levi_civita(orientation, normal_vector)
             coeffs[cell] = get_relative_orientation(reduced_orientation,
                     cell.orientation())
@@ -283,32 +385,40 @@ def cubical_cell_boundary(ndims, basepoint_coords, direction, orientation,
         coord[face_direction] += scale
         cell = cubical_cell(ndims-1, coord, remaining_directions, universe,
                 with_midpoints, scale, pointclass)
-        if not universe.cell_on_boundary(cell):
+        if universe.contains_cell(cell, include_boundary_cells):
             reduced_orientation = reduce_projected_levi_civita(orientation, -normal_vector)
             coeffs[cell] = get_relative_orientation(reduced_orientation,
                     cell.orientation())
 
     return FormalIntegerSum(coeffs)
 
-def _cubical_complex_base(ndims, extents, universe, with_midpoints, scale, pointclass):
+def _cubical_complex_base(ndims, extents, universe, with_midpoints, scale,
+        include_boundary_cells=False, pointclass=PointInUniverse):
     cplx = CellComplex(ndims)
     for celldim in xrange(ndims+1):
         for direction in itertools.combinations(xrange(ndims),celldim):
-            coord_ranges = [ xrange(extents[i][0], extents[i][1], scale) for i in xrange(ndims) ]
+            coord_ranges = [ xrange(extents[i][0], extents[i][1] + 1, scale) for i in xrange(ndims) ]
             for coord in itertools.product(*coord_ranges):
                 cell = cubical_cell(celldim,coord,direction,
                         universe, with_midpoints, scale, pointclass)
-                if not universe.cell_on_boundary(cell):
+                if universe.contains_cell(cell, include_boundary_cells):
                     cplx.add_cell(celldim,
                             cell,
                             cubical_cell_boundary(celldim,coord,direction,
                                 cell.orientation(), universe,
-                                with_midpoints,scale,
+                                with_midpoints,scale,include_boundary_cells,
                                 pointclass)
                             )
     return cplx
 
-def cubical_complex(ndims, sizes, open_dirs, with_midpoints=False, scale=1,
+#def minimal_complex_torus(ndims,scale=1,pointclass=PointInUniverse):
+#    extents = [ [0,scale] ]*ndims
+#    return _cubical_complex_base(ndims, 
+#            [ [0,scale] ]*ndims, FiniteCubicUniverse(extents, []),
+#            with_midpoints=True, scale=scale, pointclass=pointclass)
+
+def cubical_complex(ndims, sizes, open_dirs=[], with_midpoints=False, scale=1,
+        include_boundary_cells=False,
         pointclass=PointInUniverse):
     assert len(sizes) == ndims
     assert all(d >= 0 and d < ndims for d in open_dirs)
@@ -318,9 +428,27 @@ def cubical_complex(ndims, sizes, open_dirs, with_midpoints=False, scale=1,
             raise ValueError, "Don't use this function to construct a compactified direction of length <= 2 without setting with_midpoints=True, this causes problems."
 
     extents = [ [-sizes[i]*scale,sizes[i]*scale] for i in xrange(ndims) ]
-    universe = OpenToroidalUniverse(extents, open_dirs)
+    universe = FiniteCubicUniverse(extents, open_dirs)
     return _cubical_complex_base(ndims, extents, universe,
             with_midpoints,scale,pointclass)
+
+def torus_minimal_barycentric_subdivision(ndims):
+    scale = 2
+    extents = [[0,scale]]*ndims
+    universe = FiniteCubicUniverse(extents, range(ndims))
+    pointclass = IntegerPointInUniverse
+
+    c = _cubical_complex_base(ndims, extents, universe, with_midpoints=True,
+            scale=scale, include_boundary_cells=True, pointclass=pointclass)
+    #return c
+
+    c2 = c.barycentric_subdivision()
+    #return c2
+
+    gens = list(translation_generators_numpy(ndims,scale=scale,with_inverses=True))
+    equiv_relation = EquivalenceRelationFromCommutingActionGenerators(gens,
+            c2.all_cells_iterator(), reduce_order=1)
+    return c2.quotient(equiv_relation)
 
 def get_stabilizer_group(cell,G):
     gs = [g for g in G if cell.act_with(g) == cell]
@@ -514,6 +642,46 @@ def get_group_action_on_cells(cells, G, inverse=False):
 
     return mapped_cell_indices, mapping_parities
 
+class OrderedSimplex(object):
+    """ This class represents a (combinatorial) simplex, i.e. a tuple of
+    vertices (v_1, ... , v_n). Note that it is assumed that there is a partial
+    ordering on vertices and that the vertices are input such that v_1 < v_2 <
+    v_3 < ... < v_n. This ordering must also be preserved under action on the
+    vertices. """
+
+    def __init__(self, vertices):
+        self.vertices = tuple(vertices)
+
+    def __eq__(a,b):
+        return a.vertices == b.vertices
+
+    def __ne__(a,b):
+        return a.vertices != b.vertices
+
+    def __hash__(self):
+        return hash(self.vertices)
+
+    def boundary(self):
+        n = len(self.vertices)
+        if n == 1:
+            return FormalIntegerSum({})
+
+        coeffs = {}
+        for i in xrange(n):
+            reduced_word = self.vertices[0:i] + self.vertices[(i+1):]
+            coeffs[OrderedSimplex(reduced_word)] = (-1)**i
+
+        return FormalIntegerSum(coeffs)
+
+    def act_with(self,action):
+        return OrderedSimplex(v.act_with(action) for v in self.vertices)
+
+    def __str__(self):
+        return repr(self)
+
+    def __repr__(self):
+        return "SIMPLEX" + str(self.vertices)
+
 class CellComplex(object):
     @staticmethod
     def _get_action_matrix(cells,action):
@@ -524,24 +692,44 @@ class CellComplex(object):
             A[j,i] = get_relative_orientation(acted_cell.orientation(), cells[j].orientation())
         return A
 
-    #def get_first_group_coboundary_matrix(self, G, k):
-    #    cells = self.cells[k]
+    def all_cells_iterator(self):
+        for cells_k in self.cells:
+            for cell in cells_k:
+                yield cell
 
-    #    A = numpy.zeros( (G.size(), len(cells), len(cells)), dtype=int)
+    def quotient(self, equiv_relation):
+        cplx = CellComplex(self.ndims)
 
-    #    for ci in xrange(len(cells)):
-    #        for g in G:
-    #            gi = g.toindex()
+        for k in xrange(self.ndims+1):
+            quotient_cells = set(QuotientCell(cell,equiv_relation) for cell in self.cells[k])
+            for q in quotient_cells:
+                cplx.add_cell(k, q)
 
-    #            acted_cell = cells[ci].act_with( (g**(-1)).as_matrix_representative() )
-    #            acted_ci = cells.index(acted_cell)
-    #            parity = get_relative_orientation(acted_cell.orientation, cells[acted_ci].orientation) 
+        return cplx
 
-    #            A[gi,ci,acted_ci] += parity
-    #            A[gi,ci,ci] += -1
+    def _all_contained_cells_iterator(self, cell):
+        for boundary_cell in self.boundary_data[cell].coeffs.keys():
+            yield boundary_cell
+            for c in self._all_contained_cells_iterator(boundary_cell):
+                yield c
 
-    #    return numpy.reshape(A, (G.size()*len(cells), len(cells)))
-    
+    def _barycentric_word_iterator(self, base_cell=None):
+        if base_cell is None:
+            for cell in self.all_cells_iterator():
+                for word in self._barycentric_word_iterator(cell):
+                    yield word
+        else:
+            yield (base_cell,)
+            for cell in self._all_contained_cells_iterator(base_cell):
+                for word in self._barycentric_word_iterator(cell):
+                    yield word + (base_cell,)
+
+    def barycentric_subdivision(self):
+        cplx = CellComplex(self.ndims)
+        for word in self._barycentric_word_iterator():
+            cplx.add_cell(len(word)-1, OrderedSimplex(word))
+        return cplx
+
     def _get_action_on_cell_index(self,cells,action,i):
         acted_cell = cells[i].act_with(action)
         return cells.index(acted_cell)
@@ -612,9 +800,12 @@ class CellComplex(object):
 
     #    return AG
 
-    def add_cell(self, ndim, cell, boundary):
+    def add_cell(self, ndim, cell, boundary=None):
         self.cells[ndim] += [cell]
-        self.boundary_data[cell] = boundary
+        if boundary is None:
+            self.boundary_data[cell] = cell.boundary()
+        else:
+            self.boundary_data[cell] = boundary
 
     def __init__(self,ndims):
         self.ndims = ndims
