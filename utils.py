@@ -39,6 +39,30 @@ class ElementWiseArray(tuple):
         assert len(self) == len(other)
         return ElementWiseArray([x + y for (x,y) in itertools.izip(self,other)])
 
+class IndexedSet(object):
+    def __init__(self):
+        self.el_to_index = dict()
+        self.index_to_el = list()
+
+    def append(self, o):
+        if o not in self.el_to_index:
+            self.index_to_el.append(o)
+            index = len(self.index_to_el)-1
+            self.el_to_index[o] = index
+
+    def index(self, o):
+        return self.el_to_index[o]
+
+    def __getitem__(self, i):
+        return self.index_to_el[i]
+
+    def __len__(self):
+        return len(self.index_to_el)
+
+    def __iter__(self):
+        return iter(self.index_to_el)
+
+
 class FormalIntegerSum(object):
     def __init__(self,coeffs={}):
         if not isinstance(coeffs,dict):

@@ -4,6 +4,7 @@ import numpy
 import sys
 import cProfile
 import time
+import scipy.io
 from scipy import sparse
 
 from chaincplx.utils import *
@@ -472,8 +473,7 @@ def torus_minimal_barycentric_subdivision(ndims):
 
     gens = list(translation_generators_numpy(ndims,scale=scale,with_inverses=True))
     equiv_relation = EquivalenceRelationFromCommutingActionGenerators(gens,
-            c2.all_cells_iterator(), reduce_order=1,
-            precompute_representatives_for=cell.all_cells_iterator())
+            c2.all_cells_iterator(), reduce_order=1)
     return c2.quotient(equiv_relation)
 
 def get_stabilizer_group(cell,G):
@@ -987,6 +987,7 @@ def image_of_constrained_subspace(A,B,encoder):
     K = right_kernel_matrix(B, encoder)
     AK = encoder.numpy_matrix_multiply(A,K)
     C = column_space_matrix(AK, encoder)
+    scipy.io.savemat('K.mat', {'B': B, 'K': K, 'C': C})
     return [C[:,i].flat for i in xrange(C.shape[1])]
 
 def trivialized_by_E3_space(cplx,n,k,G,encoder, resolution):
