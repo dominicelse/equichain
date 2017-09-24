@@ -265,7 +265,8 @@ class QuotientCell(object):
         return "QUOTIENT:" + str(self.representative_cell)
 
 class EquivalenceRelationFromCommutingActionGenerators(object):
-    def __init__(self, gens, representatives, default_max_order=5, reduce_order=None):
+    def __init__(self, gens, representatives, default_max_order=5,
+            reduce_order=None, precompute_representatives_for=None):
         self.gens = gens
         self.default_max_order = default_max_order
 
@@ -284,6 +285,10 @@ class EquivalenceRelationFromCommutingActionGenerators(object):
             self.map_to_representatives = dict( (cell,cell) for cell in
                     representatives )
             self.representatives = frozenset(representatives)
+
+        if precompute_representatives_for is not None:
+            for cell in precompute_representatives_for:
+                self.canonical_representative(cell)
 
     def canonical_representative(self,cell, max_order=None, return_bool=False):
         if cell in self.map_to_representatives:
@@ -467,7 +472,8 @@ def torus_minimal_barycentric_subdivision(ndims):
 
     gens = list(translation_generators_numpy(ndims,scale=scale,with_inverses=True))
     equiv_relation = EquivalenceRelationFromCommutingActionGenerators(gens,
-            c2.all_cells_iterator(), reduce_order=1)
+            c2.all_cells_iterator(), reduce_order=1,
+            precompute_representatives_for=cell.all_cells_iterator())
     return c2.quotient(equiv_relation)
 
 def get_stabilizer_group(cell,G):
@@ -716,7 +722,7 @@ class CellComplex(object):
             for cell in cells_k:
                 yield cell
 
-    def _all_cells_iterator_unoriented(self):
+    def all_cells_iterator_unoriented(self):
         for cells_k in self.cells:
             for cell in cells_k:
                 yield cell.forget_orientation()
@@ -739,7 +745,7 @@ class CellComplex(object):
 
     def _barycentric_word_iterator(self, base_cell=None):
         if base_cell is None:
-            for cell in self._all_cells_iterator_unoriented():
+            for cell in self.all_cells_iterator_unoriented():
                 for word in self._barycentric_word_iterator(cell):
                     yield word
         else:
@@ -826,7 +832,7 @@ class CellComplex(object):
     #    return AG
 
     def add_cell(self, ndim, cell, boundary=None):
-        self.cells[ndim] += [cell]
+        self.cells[ndim].append(cell)
         if boundary is None:
             self.boundary_data[cell] = cell.boundary()
         else:
@@ -837,7 +843,7 @@ class CellComplex(object):
         self.cells = [None]*(ndims+1)
         self.boundary_data = {}
         for i in xrange(ndims+1):
-            self.cells[i] = []
+            self.cells[i] = IndexedSet()
 
     def get_group_action_on_cells(self, G, k, inverse=False):
         return get_group_action_on_cells(self.cells[k], G, inverse)
