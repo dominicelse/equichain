@@ -1,5 +1,6 @@
 from __future__ import division
 import itertools
+import functools
 import numpy
 import sys
 import cProfile
@@ -267,9 +268,11 @@ class QuotientCell(object):
 
 class EquivalenceRelationFromCommutingActionGenerators(object):
     def __init__(self, gens, representatives, default_max_order=5,
-            reduce_order=None, precompute_representatives_for=None):
+            reduce_order=None, precompute_representatives_for=None,
+            representatives_helper=None):
         self.gens = gens
         self.default_max_order = default_max_order
+        self.representatives_helper = representatives_helper
 
         # If reduce_order is not None, then the set of representatives might be
         # overcomplete, and we try to reduce it (but we only look for
@@ -294,6 +297,19 @@ class EquivalenceRelationFromCommutingActionGenerators(object):
     def canonical_representative(self,cell, max_order=None, return_bool=False):
         if cell in self.map_to_representatives:
             return self.map_to_representatives[cell]
+
+        # If the cell is not already cached, use the representatives helper to
+        # try to get a better representative
+        if self.representatives_helper is not None:
+            cell = self.representatives_helper(cell)
+
+            # Now try again
+            if cell in self.map_to_representatives:
+                return self.map_to_representatives[cell]
+        
+        print "uncached:", cell
+        #max(max(numpy.max(numpy.abs(pt.coords)) for pt in basecell.points)
+                #for basecell in cell.vertices)
 
         if max_order is None:
             max_order = self.default_max_order
@@ -458,10 +474,28 @@ def cubical_complex(ndims, sizes, open_dirs=[], with_midpoints=False, scale=1,
     return _cubical_complex_base(ndims, extents, universe,
             with_midpoints,scale,include_boundary_cells,pointclass)
 
+def _find_outside_universe(universe, cell):
+    for v in cell.vertices:
+        for p in v.points:
+            if universe.point_outside(p):
+                return p
+
+def _torus_minimal_barycentric_subdivision_representatives_helper(toroidal_universe,
+        pointclass, cell):
+    for v in cell.vertices:
+        for p in v.points:
+            p_translated = pointclass(toroidal_universe, p.coords)
+            if not numpy.array_equal(p_translated.coords,p.coords):
+                t = p_translated.coords - p.coords
+                return cell.act_with(affine_transformation_from_translation_vector_numpy(t))
+
+    return cell
+
 def torus_minimal_barycentric_subdivision(ndims):
     scale = 2
     extents = [[0,scale]]*ndims
     universe = FiniteCubicUniverse(extents, range(ndims))
+    toroidal_universe = FiniteCubicUniverse(extents, [])
     pointclass = IntegerPointInUniverse
 
     c = _cubical_complex_base(ndims, extents, universe, with_midpoints=True,
@@ -471,9 +505,15 @@ def torus_minimal_barycentric_subdivision(ndims):
     c2 = c.barycentric_subdivision()
     #return c2
 
+
     gens = list(translation_generators_numpy(ndims,scale=scale,with_inverses=True))
     equiv_relation = EquivalenceRelationFromCommutingActionGenerators(gens,
             c2.all_cells_iterator(), reduce_order=1)
+    # Actually, using the representatives helper doesn't seem to improve
+    # performance that much, so I disabled it.
+            #representatives_helper=functools.partial(_torus_minimal_barycentric_subdivision_representatives_helper,
+            #    toroidal_universe,pointclass))
+
     return c2.quotient(equiv_relation)
 
 def get_stabilizer_group(cell,G):

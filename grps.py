@@ -334,13 +334,19 @@ def translation_generators_numpy(d, scale=1, with_inverses=False):
             A[i,d] = -scale
             yield A
 
-def affine_transformation_from_translation_vector_sage(v):
+#def affine_transformation_from_translation_vector_sage(v):
+#    d = len(v)
+#    A = matrix(ZZ, n+1, n+1)
+#    for i in xrange(d):
+#        A[i,i] = 1
+#    A[0:d,d] = v
+#    return A
+
+def affine_transformation_from_translation_vector_numpy(v):
     d = len(v)
-    A = matrix(ZZ, n+1, n+1)
-    for i in xrange(d):
-        A[i,i] = 1
+    A = numpy.eye(d+1, dtype=int)
     A[0:d,d] = v
-    return A
+    return numpy.asmatrix(A)
 
 #def toroidal_space_group(d,n,L):
 #    G = gap.SpaceGroupIT(d,n)
