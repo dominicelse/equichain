@@ -307,7 +307,6 @@ class EquivalenceRelationFromCommutingActionGenerators(object):
             if cell in self.map_to_representatives:
                 return self.map_to_representatives[cell]
         
-        print "uncached:", cell
         #max(max(numpy.max(numpy.abs(pt.coords)) for pt in basecell.points)
                 #for basecell in cell.vertices)
 
