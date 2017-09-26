@@ -69,9 +69,10 @@ class IntegerPointInUniverse(object):
         self.universe = universe
         self.coords = universe.canonicalize_coords_int(coords)
         self.coords.setflags(write=False)
-        
+        self._hash = hash(self.coords.data)
+
     def __hash__(self):
-        return hash(self.coords.data)
+        return self._hash
 
     def __eq__(x,y):
         return numpy.array_equal(x.coords,y.coords)
