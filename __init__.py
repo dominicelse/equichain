@@ -64,45 +64,75 @@ class PointInUniverse(object):
 
         return ret
 
-class IntegerPointInUniverse(object):
-    def __init__(self, universe, coords):
-        self.universe = universe
-        self.coords = universe.canonicalize_coords_int(coords)
-        self.coords.setflags(write=False)
-        self._hash = hash(self.coords.data)
+#class IntegerPointInUniverse(object):
+#    def __init__(self, universe, coords):
+#        self.universe = universe
+#        self.coords = numpy.ascontiguousarray(universe.canonicalize_coords_int(coords))
+#        self.coords.setflags(write=False)
+#        self._hash = hash(self.coords.data)
+#
+#    def __hash__(self):
+#        return self._hash
+#
+#    def __eq__(x,y):
+#        return numpy.array_equal(x.coords,y.coords)
+#
+#    def __ne__(x,y):
+#        return not x == y
+#
+#    def __str__(self):
+#        return str(self.coords)
+#
+#    def __repr__(self):
+#        return str(self)
+#
+#    def __len__(self):
+#        return len(self.coords)
+#
+#    def act_with(self, action):
+#        if isinstance(action, IntegerPointInUniverseAction):
+#            return action(self)
+#
+#        if isinstance(action, MatrixQuotientGroupElement):
+#            action = action.as_matrix_representative_numpy_int()
+#
+#        if isinstance(action, numpy.matrix):
+#            action = numpy.array(action)
+#
+#        v = numpy.empty(len(self.coords)+1, dtype=int)
+#        v[0:-1] = self.coords
+#        v[-1] = 1
+#        vout = numpy.dot(action,v)
+#        ret = IntegerPointInUniverse(self.universe, vout[:-1])
+#
+#        return ret
 
-    def __hash__(self):
-        return self._hash
+from cython_fns import IntegerPointInUniverse,IntegerPointInUniverseAction,IntegerPointInUniverseTranslationAction
 
-    def __eq__(x,y):
-        return numpy.array_equal(x.coords,y.coords)
-
-    def __ne__(x,y):
-        return not x == y
-
-    def __str__(self):
-        return str(self.coords)
-
-    def __repr__(self):
-        return str(self)
-
-    def __len__(self):
-        return len(self.coords)
-
-    def act_with(self, action):
-        if isinstance(action, MatrixQuotientGroupElement):
-            action = action.as_matrix_representative_numpy_int()
-
-        if isinstance(action, numpy.matrix):
-            action = numpy.array(action)
-
-        v = numpy.empty(len(self.coords)+1, dtype=int)
-        v[0:-1] = self.coords
-        v[-1] = 1
-        vout = numpy.dot(action,v)
-        ret = IntegerPointInUniverse(self.universe, vout[:-1])
-
-        return ret
+#class PyIntegerPointInUniverseAction:
+#    pass
+#
+#class PyIntegerPointInUniverseTranslationAction(IntegerPointInUniverseAction):
+#    def __init__(self, trans):
+#        self.trans = numpy.array(trans, dtype=int)
+#
+#    def __call__(self, pt):
+#        return IntegerPointInUniverse(pt.universe, pt.coords + self.trans)
+#
+#    def __mul__(x, y):
+#        return IntegerPointInUniverseTranslationAction(x.trans + y.trans)
+#
+#    def __pow__(self,n):
+#        return IntegerPointInUniverseTranslationAction(n*self.trans)
+#
+#    @staticmethod
+#    def get_translation_basis(d, scale=1):
+#        ret = []
+#        for i in xrange(d):
+#            trans = numpy.zeros(d, dtype=int)
+#            trans[i] = scale
+#            ret.append(IntegerPointInUniverseTranslationAction(trans))
+#        return ret
 
 class Universe(object):
     def cell_on_boundary(self, cell):
@@ -157,8 +187,21 @@ class FiniteCubicUniverse(Universe):
                     return True
         return False
 
+class CubicUniverseWithBoundary(FiniteCubicUniverse):
+    # This is a special case of FiniteCubicUniverse in which open_dirs =
+    # range(len(extents)), with an optimized version of canonicalize_coords_int
+    # for this case.
+    def __init__(self,extents):
+        super(CubicUniverseWithBoundary,self).__init__(extents, range(len(extents)))
+
+    def canonicalize_coords_int(self, coords):
+        return coords
+
 class FlatUniverse(Universe):
     def canonicalize_coords(self, coords):
+        return coords
+
+    def canonicalize_coords_int(self, coords):
         return coords
 
 class ConvexHullCell(object):
@@ -315,7 +358,7 @@ class EquivalenceRelationFromCommutingActionGenerators(object):
             max_order = self.default_max_order
 
         for morder in xrange(max_order+1):
-            for k in itertools.product(range(morder+1), repeat=len(self.gens)):
+            for k in itertools.product(range(-morder,morder+1), repeat=len(self.gens)):
                 g = product( (self.gens[i]**k[i] for i in xrange(1,len(self.gens))),
                         self.gens[0]**k[0] )
                 acted_cell = cell.act_with(g)
@@ -494,8 +537,8 @@ def _torus_minimal_barycentric_subdivision_representatives_helper(toroidal_unive
 def torus_minimal_barycentric_subdivision(ndims):
     scale = 2
     extents = [[0,scale]]*ndims
-    universe = FiniteCubicUniverse(extents, range(ndims))
-    toroidal_universe = FiniteCubicUniverse(extents, [])
+    universe = CubicUniverseWithBoundary(extents)
+    #toroidal_universe = FiniteCubicUniverse(extents, [])
     pointclass = IntegerPointInUniverse
 
     c = _cubical_complex_base(ndims, extents, universe, with_midpoints=True,
@@ -506,7 +549,8 @@ def torus_minimal_barycentric_subdivision(ndims):
     #return c2
 
 
-    gens = list(translation_generators_numpy(ndims,scale=scale,with_inverses=True))
+    #gens = list(translation_generators_numpy(ndims,scale=scale,with_inverses=True))
+    gens = IntegerPointInUniverseTranslationAction.get_translation_basis(ndims,scale)
     equiv_relation = EquivalenceRelationFromCommutingActionGenerators(gens,
             c2.all_cells_iterator(), reduce_order=1)
     # Actually, using the representatives helper doesn't seem to improve
@@ -687,6 +731,7 @@ def get_action_on_cells(cells,action):
         try:
             acted_ci = cells.index(acted_cell)
         except ValueError:
+            print cells[i], acted_cell
             raise ComplexNotInvariantError
         parity = get_relative_orientation_cells(acted_cell, cells[acted_ci])
 
@@ -716,6 +761,7 @@ class OrderedSimplex(object):
 
     def __init__(self, vertices):
         self.vertices = tuple(vertices)
+        self._hash = hash(self.vertices)
 
     def __eq__(a,b):
         return a.vertices == b.vertices
@@ -724,7 +770,7 @@ class OrderedSimplex(object):
         return a.vertices != b.vertices
 
     def __hash__(self):
-        return hash(self.vertices)
+        return self._hash
 
     def boundary(self):
         n = len(self.vertices)
@@ -832,7 +878,7 @@ class CellComplex(object):
         return orbits
 
     def get_boundary_matrix(self, k):
-        cells_km1 = list(self.cells[k-1])
+        cells_km1 = self.cells[k-1]
         cells_k = self.cells[k]
 
         A = sparse.dok_matrix( (len(cells_km1), len(cells_k)), dtype=int )
