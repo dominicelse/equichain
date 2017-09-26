@@ -1,4 +1,4 @@
-#cython: boundscheck=False, profile=True
+#cython: boundscheck=False
 import chaincplx
 import numpy
 from scipy import sparse
@@ -94,7 +94,6 @@ cdef class Vector:
 
 cdef class IntegerPointInUniverse:
     cdef Vector _coords
-    cdef Vector id_strides
     cdef public object universe
     #cdef public object coords
 
@@ -103,8 +102,6 @@ cdef class IntegerPointInUniverse:
         return self._coords.to_numpy()
 
     def __init__(self, universe, coords):
-        self.id_strides = Vector(len(coords))
-
         if isinstance(universe, chaincplx.CubicUniverseWithBoundary):
             universe = None
 
