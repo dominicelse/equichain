@@ -36,6 +36,8 @@ class ZGResolution(object):
                     D[(alpha,mu), 
                       (beta,mapped_cell_indices[g,mu])] += \
                               mapping_parities[g,mu]*d_matrix.raw_access()[j,alpha]
+
+        #D.set_raw(D.raw_access().coomatrix().tocsc())
         
         if raw:
             return D.raw_access()
@@ -106,7 +108,7 @@ class HapResolution(ZGResolution):
         if not (k >= 1 and k <= self.length):
             raise ValueError, "Bad k", k
 
-        d = utils.MatrixIndexingWrapper.from_factory(sparse.dok_matrix, int,
+        d = utils.MatrixIndexingWrapper.from_factory(sparse.dok_matrix(), int,
                 out_indexer = utils.MultiIndexer(self.G.size(), self.rank(k-1)),
                 in_indexer = utils.MultiIndexer(self.rank(k))
                 )

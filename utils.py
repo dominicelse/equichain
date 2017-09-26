@@ -136,6 +136,44 @@ class MultiIndexer(object):
     def total_dim(self):
         return numpy.prod(self.dims)
 
+class COOMatrixHelperItem(object):
+    def __init__(self, parent, i, j):
+        self.parent = parent
+        self.i = i
+        self.j = j
+
+    def __iadd__(self, x):
+        self.parent.iadd_at(self.i,self.j,x)
+        return self
+
+class COOMatrixHelper(object):
+    def __init__(self, shape, dtype):
+        self.shape = shape
+        self.dtype = dtype
+
+        self.data = []
+        self.i = []
+        self.j = []
+
+    def iadd_at(self,i,j,x):
+        self.data.append(x)
+        self.i.append(i)
+        self.j.append(j)
+
+    def __getitem__(self, at):
+        return COOMatrixHelperItem(self, at[0], at[1])
+
+    def __setitem__(self,at,val):
+        if not isinstance(val,COOMatrixHelperItem):
+            raise NotImplementedError
+        if (val.i,val.j) != at:
+            raise NotImplementedError
+        if val.parent is not self:
+            raise NotImplementedError
+
+    def coomatrix(self):
+        return sparse.coo_matrix( (self.data, (self.i,self.j)), shape=self.shape, dtype=self.dtype )
+
 class MatrixIndexingWrapper(object):
     def __init__(self, A, out_indexer, in_indexer):
         assert len(A.shape) == 2
@@ -155,7 +193,6 @@ class MatrixIndexingWrapper(object):
         return (self.out_indexer.to_index(*i[0]), self.in_indexer.to_index(*i[1]))
 
     def __getitem__(self,i):
-        #print i, self._convert_index(i), self.A.shape
         return self.A[self._convert_index(i)]
 
     def __setitem__(self, i, value):
