@@ -530,7 +530,7 @@ def _torus_minimal_barycentric_subdivision_representatives_helper(toroidal_unive
             p_translated = pointclass(toroidal_universe, p.coords)
             if not numpy.array_equal(p_translated.coords,p.coords):
                 t = p_translated.coords - p.coords
-                return cell.act_with(affine_transformation_from_translation_vector_numpy(t))
+                return cell.act_with(IntegerPointInUniverseTranslationAction(t))
 
     return cell
 
@@ -538,7 +538,7 @@ def torus_minimal_barycentric_subdivision(ndims):
     scale = 2
     extents = [[0,scale]]*ndims
     universe = CubicUniverseWithBoundary(extents)
-    #toroidal_universe = FiniteCubicUniverse(extents, [])
+    toroidal_universe = FiniteCubicUniverse(extents, [])
     pointclass = IntegerPointInUniverse
 
     c = _cubical_complex_base(ndims, extents, universe, with_midpoints=True,
@@ -552,11 +552,11 @@ def torus_minimal_barycentric_subdivision(ndims):
     #gens = list(translation_generators_numpy(ndims,scale=scale,with_inverses=True))
     gens = IntegerPointInUniverseTranslationAction.get_translation_basis(ndims,scale)
     equiv_relation = EquivalenceRelationFromCommutingActionGenerators(gens,
-            c2.all_cells_iterator(), reduce_order=1)
+            c2.all_cells_iterator(), reduce_order=1,
     # Actually, using the representatives helper doesn't seem to improve
     # performance that much, so I disabled it.
-            #representatives_helper=functools.partial(_torus_minimal_barycentric_subdivision_representatives_helper,
-            #    toroidal_universe,pointclass))
+            representatives_helper=functools.partial(_torus_minimal_barycentric_subdivision_representatives_helper,
+                toroidal_universe,pointclass))
 
     return c2.quotient(equiv_relation)
 

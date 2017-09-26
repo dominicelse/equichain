@@ -1,4 +1,4 @@
-#cython: boundscheck=False
+#cython: boundscheck=False,profile=True
 import chaincplx
 import numpy
 from scipy import sparse
