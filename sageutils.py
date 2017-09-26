@@ -1,5 +1,9 @@
 from sage.all import *
 
+class NotIntegerMatrixError(Exception):
+    pass
+
+
 def sage_matrix_to_numpy_int(A):
     if not A in MatrixSpace(ZZ,A.nrows()):
         print A

@@ -66,9 +66,6 @@ class TorusTranslationGroupElement(MatrixQuotientGroupElement):
         A[0:(ndims+1),-1] = self.i
         return matrix(A)
 
-class NotIntegerMatrixError(Exception):
-    pass
-
 class GapAffineQuotientGroup(object):
     def _base_init(self):
         self.stored_coset_representatives = dict()
