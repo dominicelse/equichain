@@ -1,22 +1,15 @@
-##cython: boundscheck=False, wraparound=False, profile=True 
+#cython: boundscheck=False, profile=True
 import chaincplx
 import numpy
 from scipy import sparse
 cimport numpy as np
+cimport cython
 import numpy as np
 from cpython.object cimport Py_EQ,Py_NE
 from libc.stdlib cimport calloc,free
 
 cdef enum:
     strideprime = 997
-
-cdef class Foo:
-    @staticmethod
-    cdef void hello():
-        print "Hello, world!"
-
-    def __init__(self):
-        Foo.hello()
 
 cdef class Vector:
     cdef np.int_t* coords
@@ -36,6 +29,23 @@ cdef class Vector:
         cdef int i
         for i in xrange(self.n):
             self.coords[i] = view[i]
+
+    cdef Vector add(Vector x, Vector y):
+        cdef Vector ret = Vector(x.n)
+        cdef int i
+
+        for i in xrange(x.n):
+            ret.coords[i] = x.coords[i] + y.coords[i]
+
+        return ret
+
+    cdef Vector mul(Vector x, np.int_t n):
+        cdef Vector ret = Vector(x.n)
+
+        for i in xrange(x.n):
+            ret.coords[i] = x.coords[i]*n
+
+        return ret
 
     @staticmethod
     cdef Vector from_numpy(np.ndarray v):
@@ -60,7 +70,7 @@ cdef class Vector:
             tot += stride*self.coords[i]
             stride *= strideprime
 
-        return stride
+        return tot
 
     cdef bint equals(self, Vector y):
         cdef int i
@@ -84,6 +94,7 @@ cdef class Vector:
 
 cdef class IntegerPointInUniverse:
     cdef Vector _coords
+    cdef Vector id_strides
     cdef public object universe
     #cdef public object coords
 
@@ -92,15 +103,28 @@ cdef class IntegerPointInUniverse:
         return self._coords.to_numpy()
 
     def __init__(self, universe, coords):
+        self.id_strides = Vector(len(coords))
+
+        if isinstance(universe, chaincplx.CubicUniverseWithBoundary):
+            universe = None
+
         self.universe = universe
-        foo = universe.canonicalize_coords_int(coords)
-        ret = Vector.from_numpy(foo)
+        if universe is not None:
+            coords = universe.canonicalize_coords_int(coords)
+        ret = Vector.from_numpy(coords)
         self._coords = ret
 
     @staticmethod
-    cdef cmake(self, universe, Vector vector):
-        self.universe = universe
-        self._coords = vector
+    cdef IntegerPointInUniverse from_vector(object universe, Vector vector):
+        cdef IntegerPointInUniverse ret
+
+        if universe is not None:
+            return IntegerPointInUniverse(universe, vector.to_numpy())
+        else:
+            ret = IntegerPointInUniverse.__new__(IntegerPointInUniverse)
+            ret.universe = None
+            ret._coords = vector
+            return ret
 
     def __richcmp__(IntegerPointInUniverse x not None,
             IntegerPointInUniverse y not None, int cmptype):
@@ -110,7 +134,7 @@ cdef class IntegerPointInUniverse:
         return self._coords.hashfn()
 
     def __str__(self):
-        return str(self.coords.to_numpy())
+        return str(self.coords)
 
     def __repr__(self):
         return str(self)
@@ -119,8 +143,12 @@ cdef class IntegerPointInUniverse:
         return self._coords.n
 
     def act_with(self, action):
-        if isinstance(action, chaincplx.IntegerPointInUniverseAction):
-            return action(self)
+        cdef IntegerPointInUniverseTranslationAction cast_action
+
+        if isinstance(action, IntegerPointInUniverseTranslationAction):
+            cast_action = action
+            return IntegerPointInUniverse.from_vector(self.universe,
+                    self._coords.add(cast_action.trans))
 
         if isinstance(action, chaincplx.MatrixQuotientGroupElement):
             action = action.as_matrix_representative_numpy_int()
@@ -136,21 +164,24 @@ cdef class IntegerPointInUniverse:
 
         return ret
 
-cdef class IntegerPointInUniverseAction:
-    pass
+cdef class IntegerPointInUniverseTranslationAction:
+    cdef Vector trans
+    
+    def __init__(self, tr):
+        self.trans = Vector.from_numpy(tr)
 
-class IntegerPointInUniverseTranslationAction(IntegerPointInUniverseAction):
-    def __init__(self, trans):
-        self.trans = numpy.array(trans, dtype=int)
+    def __mul__(IntegerPointInUniverseTranslationAction x not None,
+            IntegerPointInUniverseTranslationAction y not None):
+        cdef IntegerPointInUniverseTranslationAction ret
+        ret = IntegerPointInUniverseTranslationAction.__new__(IntegerPointInUniverseTranslationAction)
+        ret.trans = x.trans.add(y.trans)
+        return ret
 
-    def __call__(self, pt):
-        return IntegerPointInUniverse(pt.universe, pt.coords + self.trans)
-
-    def __mul__(x, y):
-        return IntegerPointInUniverseTranslationAction(x.trans + y.trans)
-
-    def __pow__(self,n):
-        return IntegerPointInUniverseTranslationAction(n*self.trans)
+    def __pow__(IntegerPointInUniverseTranslationAction self not None, int n, object z):
+        cdef IntegerPointInUniverseTranslationAction ret
+        ret = IntegerPointInUniverseTranslationAction.__new__(IntegerPointInUniverseTranslationAction)
+        ret.trans = self.trans.mul(n)
+        return ret
 
     @staticmethod
     def get_translation_basis(d, scale=1):

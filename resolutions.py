@@ -90,11 +90,17 @@ class HapResolution(ZGResolution):
 
         self.R = HapResolutionThinWrapper(R) 
         self.length = self.R.length()
+        self.cached_dimensions = {}
 
     def rank(self,k):
         if not (k >= 0 and k <= self.length):
             raise IndexError, k
-        return self.R.dimension(k)
+        if k in self.cached_dimensions:
+            return self.cached_dimensions[k]
+        else:
+            dim = self.R.dimension(k)
+            self.cached_dimensions[k] = dim
+            return dim
 
     def _compute_d_matrix_raw(self,k):
         if not (k >= 1 and k <= self.length):

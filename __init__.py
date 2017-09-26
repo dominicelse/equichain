@@ -90,7 +90,7 @@ class PointInUniverse(object):
 #        return len(self.coords)
 #
 #    def act_with(self, action):
-#        if isinstance(action, IntegerPointInUniverseAction):
+#        if isinstance(action, IntegerPointInUniverseTranslationAction):
 #            return action(self)
 #
 #        if isinstance(action, MatrixQuotientGroupElement):
@@ -107,12 +107,9 @@ class PointInUniverse(object):
 #
 #        return ret
 
-from cython_fns import IntegerPointInUniverse,IntegerPointInUniverseAction,IntegerPointInUniverseTranslationAction
+from cython_fns import IntegerPointInUniverse,IntegerPointInUniverseTranslationAction
 
-#class PyIntegerPointInUniverseAction:
-#    pass
-#
-#class PyIntegerPointInUniverseTranslationAction(IntegerPointInUniverseAction):
+#class IntegerPointInUniverseTranslationAction(object):
 #    def __init__(self, trans):
 #        self.trans = numpy.array(trans, dtype=int)
 #
@@ -253,8 +250,8 @@ class ConvexHullCell(object):
 
 class ConvexHullCellWithMidpoint(ConvexHullCell):
     def __init__(self, points, orientation, midpoint):
-        super(ConvexHullCellWithMidpoint,self).__init__(points,orientation)
         self.midpoint = midpoint
+        super(ConvexHullCellWithMidpoint,self).__init__(points,orientation)
 
     def act_with(self,action):
         pt = super(ConvexHullCellWithMidpoint,self).act_with(action)
@@ -268,7 +265,8 @@ class ConvexHullCellWithMidpoint(ConvexHullCell):
         return ConvexHullCellWithMidpoint(self.points, None, self.midpoint)
 
     def __hash__(self):
-        return super(ConvexHullCellWithMidpoint,self).__hash__() ^ hash(self.midpoint)
+        h = hash((super(ConvexHullCellWithMidpoint,self).__hash__(), self.midpoint))
+        return h
 
     def __eq__(self,b):
         return super(ConvexHullCellWithMidpoint,self).__eq__(b) and self.midpoint == b.midpoint
@@ -325,6 +323,7 @@ class EquivalenceRelationFromCommutingActionGenerators(object):
             self.map_to_representatives = {}
             self.representatives = set()
 
+
             for cell in representatives:
                 if not self.canonical_representative(cell,max_order=reduce_order,return_bool=True):
                     self.representatives.add(cell)
@@ -364,6 +363,7 @@ class EquivalenceRelationFromCommutingActionGenerators(object):
                 acted_cell = cell.act_with(g)
                 if acted_cell in self.representatives:
                     self.map_to_representatives[cell] = acted_cell
+
                     if return_bool:
                         return True
                     else:
