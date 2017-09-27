@@ -79,7 +79,7 @@ class BarResolution(ZGResolution):
                     )
                 d[ (0,) + a, gi ] += (-1)**i
 
-        return d.raw_access().tocsc()
+        return d.raw_access().coomatrix().tocsc()
 
     def __init__(self, G):
         super(BarResolution,self).__init__(G)
