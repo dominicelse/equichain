@@ -3,20 +3,30 @@ import itertools
 import functools
 import numpy
 import sys
-import cProfile
-import time
-import scipy.io
+#import cProfile
+#import time
+#import scipy.io
+import warnings
 from scipy import sparse
 
 from chaincplx.utils import *
 from chaincplx.grps import *
 from chaincplx.sageutils import *
 import chaincplx.resolutions as resolutions
+from chaincplx import magmaconv
 from sage.all import *
 
 from sage.matrix.matrix_mod2_dense import Matrix_mod2_dense
 
 import cython_fns
+
+
+try:
+    magma('1')
+    use_magma = True
+except RuntimeError:
+    warnings.warn("Could not load Magma. Falling back to Sage for all functionality.")
+    use_magma = False
 
 class PointInUniverse(object):
     def __init__(self, universe, coords):
@@ -731,7 +741,6 @@ def get_action_on_cells(cells,action):
         try:
             acted_ci = cells.index(acted_cell)
         except ValueError:
-            print cells[i], acted_cell
             raise ComplexNotInvariantError
         parity = get_relative_orientation_cells(acted_cell, cells[acted_ci])
 
