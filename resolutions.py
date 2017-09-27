@@ -60,7 +60,7 @@ class BarResolution(ZGResolution):
         return self.G.size()**n
 
     def _compute_d_matrix_raw(self,n):
-        d = utils.MatrixIndexingWrapper.from_factory(sparse.dok_matrix, int,
+        d = utils.MatrixIndexingWrapper.from_factory(utils.COOMatrixHelper, int,
                 out_indexer = utils.MultiIndexer.tensor(self.G.size(), n),
                 in_indexer = utils.MultiIndexer.tensor(self.G.size(), n)
                 )
@@ -79,7 +79,7 @@ class BarResolution(ZGResolution):
                     )
                 d[ (0,) + a, gi ] += (-1)**i
 
-        return d.raw_access()
+        return d.raw_access().tocsc()
 
     def __init__(self, G):
         super(BarResolution,self).__init__(G)
