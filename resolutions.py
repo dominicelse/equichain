@@ -23,21 +23,20 @@ class ZGResolution(object):
         self.G = G
 
     def dual_d_matrix(self,n, ncells, mapped_cell_indices, mapping_parities, raw=True):
-        D = utils.MatrixIndexingWrapper.from_factory(sparse.dok_matrix, int,
+        D = utils.MatrixIndexingWrapper.from_factory(utils.COOMatrixHelper, int,
                 out_indexer=utils.MultiIndexer(self.rank(n+1),ncells),
                 in_indexer=utils.MultiIndexer(self.rank(n),ncells))
 
         d_matrix = self.d_matrix(n+1)
 
         for mu in xrange(ncells):
-            for alpha in xrange(self.rank(n+1)):
-                for j in d_matrix.raw_access()[:,alpha].nonzero()[0]:
-                    g,beta = d_matrix.out_indexer.from_index(j)
-                    D[(alpha,mu), 
-                      (beta,mapped_cell_indices[g,mu])] += \
-                              mapping_parities[g,mu]*d_matrix.raw_access()[j,alpha]
+            for j,alpha,value in itertools.izip(*sparse.find(d_matrix.raw_access())):
+                g,beta = d_matrix.out_indexer.from_index(j)
+                D[(alpha,mu), 
+                  (beta,mapped_cell_indices[g,mu])] += \
+                          mapping_parities[g,mu]*value
 
-        #D.set_raw(D.raw_access().coomatrix().tocsc())
+        D.set_raw(D.raw_access().coomatrix().tocsr())
         
         if raw:
             return D.raw_access()
@@ -108,7 +107,7 @@ class HapResolution(ZGResolution):
         if not (k >= 1 and k <= self.length):
             raise ValueError, "Bad k", k
 
-        d = utils.MatrixIndexingWrapper.from_factory(sparse.dok_matrix(), int,
+        d = utils.MatrixIndexingWrapper.from_factory(utils.COOMatrixHelper, int,
                 out_indexer = utils.MultiIndexer(self.G.size(), self.rank(k-1)),
                 in_indexer = utils.MultiIndexer(self.rank(k))
                 )
@@ -133,7 +132,7 @@ class HapResolution(ZGResolution):
 
                 d[(gi,i-1), (m,)] += coeff
 
-        return d.raw_access()
+        return d.raw_access().coomatrix().tocsr()
 
 class HapResolutionThinWrapper(object):
     def __init__(self,R):
