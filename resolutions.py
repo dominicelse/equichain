@@ -2,6 +2,7 @@ from scipy import sparse
 import chaincplx.utils as utils
 import itertools
 import functools
+import chaincplx.linalg as linalg
 from sage.all import *
 
 class FreeModuleSyllable(object):
@@ -39,7 +40,7 @@ class ZGResolution(object):
         D.set_raw(D.raw_access().coomatrix().tocsr())
         
         if raw:
-            return D.raw_access()
+            return linalg.ScipySparseMatrixOverRing(D.raw_access(), ring=ZZ)
         else:
             return D
 

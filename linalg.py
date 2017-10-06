@@ -1,7 +1,9 @@
+from __future__ import division
 from sage.all import *
 import numpy
 from chaincplx import magma_fns
 from scipy import sparse
+import functools
 
 try:
     magma('1')
@@ -14,38 +16,36 @@ def kernel_mod_image(d1,d2):
     # Returns the torsion coefficients of (ker d1)/(im d2), where d1 d2 = 0
 
     #image = column_space_matrix(d2,encoder)
-    d1 = d1.to_numpydense()
-    d2 = d2.to_numpydense()
+    kernel = d1.right_kernel_matrix()
 
-    kernel = d1.right_kernel_matrix().to_numpydense()
+    assert d1.dot(d2).count_nonzero() == 0
 
-    #assert numpy.count_nonzero(encoder.numpy_matrix_multiply(d1, d2)) == 0
-    print "TODO: restore a check here."
-
-    AB = d1.factory().bmat(([[kernel,-d2]])
-    k2 = right_kernel_matrix(AB, encoder) 
+    AB = d2.factory().bmat([[kernel,-d2]])
+    k2 = AB.right_kernel_matrix()
     alpha = k2[0:kernel.shape[1],:]
-    divisors = encoder.sage_matrix_from_numpy(alpha).elementary_divisors()
+    divisors = alpha.elementary_divisors()
 
     return [ divisor for divisor in divisors if divisor != 1 ]
 
-class NumpyEncoder(object):
-    def solve_matrix_equation(self,A,b):
-        return self.sage_vector_to_numpy(
-                self.sage_matrix_from_numpy(A).solve_right(
-                    self.sage_vector_from_numpy(b) ) )
-
-    def matrix_passthrough(self, fn, A, *args, **kwargs):
-        A = self.sage_matrix_from_numpy(A)
-        ret = getattr(A, fn)(*args, **kwargs)
-        return self.sage_matrix_to_numpy(ret)
+def isiterable_or_slice(i):
+    try:
+        iter(i)
+        return True
+    except TypeError:
+        return isinstance(i,slice)
 
 class GenericMatrix(object):
     def __init__(self):
         raise NotImplementedError
 
+    def __str__(self):
+        return str(self.A)
+    
+    def __repr__(self):
+        return repr(self.A)
+
     def right_kernel_matrix(self):
-        return self.to_sagedense().right_kernel_matrix().convert_to_like(A)
+        return self.convert_to_like_self(self.to_sagedense().right_kernel_matrix())
 
     def pivots(self):
         return self.to_sagedense().pivots()
@@ -53,49 +53,117 @@ class GenericMatrix(object):
     def column_space_matrix(self):
         return self.A[:,self.pivots()]
 
-class ScipyOrNumpyMatrixOverRingTemplate(GenericMatrix):
+    def elementary_divisors(self):
+        return self.to_sagedense().elementary_divisors()
+
+    def solve_right(self, v):
+        return v.convert_to_like_self(self.to_sagedense().solve_right(v.to_sagedense()))
+
+    def __getitem__(self, i):
+        if ( (isinstance(i, tuple) and any(isiterable_or_slice(x) for x in i)) or
+                isiterable_or_slice(i) ):
+            return self._constructor(self.A[i])
+        else:
+            return self.A[i]
+
+    def __setitem__(self, i, x):
+        if isinstance(x, GenericMatrix):
+            self.A[i] = x.A
+        elif isinstance(x, GenericVector):
+            print len(x.v)
+            print len(i)
+            self.A[i] = x.v
+        else:
+            self.A[i] = x
+
+    def __neg__(self):
+        return self._constructor(-self.A)
+
+class NumpyMatrixFactoryBase(object):
+    def __init__(self, constructor, vector_constructor, numpy_dtype, base_module):
+        self.constructor = constructor
+        self.vector_constructor = vector_constructor
+        self.numpy_dtype = numpy_dtype
+        self.base_module = base_module
+
+    def bmat(self, block):
+        ring = block[0][0].ring
+        for i in xrange(len(block)):
+            for j in xrange(len(block[i])):
+                assert block[i][j].ring == ring
+                block[i][j] = block[i][j].A
+        return self.constructor(self.base_module.bmat(block))
+
+    def eye(self, n):
+        return self.constructor(self.base_module.eye(n, dtype=self.numpy_dtype))
+
+    def zeros(self, shape):
+        return self.constructor(self.base_module.zeros(shape, dtype=self.numpy_dtype))
+
+    def zero_vector(self, n):
+        return self.vector_constructor(numpy.zeros(n,
+            dtype=self.numpy_dtype))
+
+    def concatenate_vectors(self, a, b):
+        return self.vector_constructor(numpy.concatenate(a,b))
+
+class ScipySparseMatrixFactory(NumpyMatrixFactoryBase):
+    def __init__(self, constructor, vector_constructor, numpy_dtype):
+        super(ScipySparseMatrixFactory,self).__init__(constructor,
+                vector_constructor, numpy_dtype, sparse)
+
+    def zeros(self, shape):
+        return self.constructor(sparse.csc_matrix(shape, dtype=self.numpy_dtype))
+
+class NumpyMatrixFactory(NumpyMatrixFactoryBase):
+    def __init__(self, constructor, numpy_dtype):
+        super(ScipySparseMatrixFactory,self).__init__(constructor, numpy_dtype, numpy)
+
+class ScipyOrNumpyMatrixOverRingGeneric(GenericMatrix):
     def __init__(self):
         raise NotImplementedError
 
     def dot(self, b):
-        return self._canonicalize(self.A.dot(b.A))
-
-    def __getitem__(self, i):
-        return self.A[i]
+        if isinstance(b, GenericVector):
+            return self._vector_constructor(self.A.dot(b.v))
+        else:
+            return self._constructor(self.A.dot(b.A))
 
     @property
     def shape(self):
         return self.A.shape
 
-class ScipySparseMatrixOverRingTemplate(ScipyOrNumpyMatrixOverRingTemplate):
-    def __init__(self):
-        raise NotImplementedError
-
-    def factory(self):
-        return sparse
-
+class ScipySparseMatrixOverRingGeneric(ScipyOrNumpyMatrixOverRingGeneric):
     def to_sagedense(self):
-        return self.tonumpydense().tosagedense()
+        return self.to_numpydense().to_sagedense()
 
     def to_numpydense(self):
-        return NumpyMatrixOverRing(self, self.A, self.ring)
+        return NumpyMatrixOverRing(self.A.toarray(), self.ring)
 
     def to_scipysparse(self):
         return self
 
-    def eye_like(self, n):
-        return self._canonicalize(sparse.eye(n, dtype=self.A.dtype))
-
-    def zeros_like(self, shape):
-        return self._canonicalize(sparse.dok_matrix(shape, dtype=self.A.dtype))
-
-class NumpyMatrixOverRingTemplate(ScipyOrNumpyMatrixOverRingTemplate):
-    def __init__(self, A, ring):
-        self.A = A
-        self.ring = ring
+    def convert_to_like_self(self,a):
+        return a.to_scipysparse()
 
     def factory(self):
-        return numpy
+        return ScipySparseMatrixFactory(numpy_dtype=self.A.dtype,
+                constructor=self._constructor,
+                vector_constructor=self._vector_constructor)
+
+    def count_nonzero(self):
+        return len(self.A.nonzero()[0])
+
+    def equals(self, b):
+        return self.shape == b.shape and len((self.A != b.A).nonzero()[0]) == 0
+
+class NumpyMatrixOverRingGeneric(ScipyOrNumpyMatrixOverRingGeneric):
+    def __init__(self):
+        raise NotImplementedError
+
+    def factory(self):
+        return NumpyMatrixFactory(numpy_dtype=self.A.dtype,
+                constructor=self._constructor)
 
     def to_sagedense(self):
         nrows,ncols = self.A.shape
@@ -103,52 +171,137 @@ class NumpyMatrixOverRingTemplate(ScipyOrNumpyMatrixOverRingTemplate):
         B.set_unsafe_from_numpy_int_array(self.A)
         return SageDenseMatrix(B)
 
+
     def to_numpydense(self):
         return self
 
     def to_scipysparse(self):
+        return ScipySparseMatrixOverRing(sparse.csc_matrix(self.A), ring=self.ring)
+
+    def convert_to_like_self(self,a):
+        return a.to_numpydense()
+
+    def count_nonzero(self):
+        return numpy.count_nonzero
+
+    def equals(self, b):
+        return numpy.array_equal(self.A, self.b.A)
+
+from sage.rings.finite_rings.integer_mod_ring import IntegerModRing_generic
+
+class NumpyMatrixOverZ(NumpyMatrixOverRingGeneric):
+    def __init__(self, A):
+        self.ring = ZZ
+        self._constructor = NumpyMatrixOverZ
+        self._vector_constructor = NumpyVectorOverZ
+        self.A = numpy.asarray(A)
+
+    def change_ring(self, new_ring):
+        if isinstance(new_ring, IntegerModRing_generic):
+            return self.NumpyMatrixOverZn(self.A, new_ring.order())
+        else:
+            raise NotImplementedError
+
+class NumpyMatrixOverZn(NumpyMatrixOverRingGeneric):
+    def __init__(self, A, n):
+        self.ring = Integers(n)
+        self.A = numpy.asarray(A) % n
+        self.n = n
+        self._constructor = functools.partial(NumpyMatrixOverZn, n=n)
+        self._vector_constructor = functools.partial(NumpyVectorOverZn, n=n)
+
+def _scipy_sparse_mod(A, n):
+    return A - ((A/n).floor()*n).astype(int)
+
+class ScipySparseMatrixOverZ(ScipySparseMatrixOverRingGeneric):
+    def __init__(self, A):
+        self.ring = ZZ
+        self._constructor = ScipySparseMatrixOverZ
+        self._vector_constructor = NumpyVectorOverZ
+        if sparse.issparse(A):
+            self.A = A
+        else:
+            self.A = sparse.csc_matrix(A)
+
+    def change_ring(self, new_ring):
+        if new_ring is ZZ:
+            return self
+        elif isinstance(new_ring, IntegerModRing_generic):
+            return ScipySparseMatrixOverZn(self.A, new_ring.order())
+        else:
+            raise NotImplementedError
+
+
+class ScipySparseMatrixOverZn(ScipySparseMatrixOverRingGeneric):
+    def __init__(self, A, n):
+        self.ring = Integers(n)
+        self._constructor = functools.partial(ScipySparseMatrixOverZn, n=n)
+        self._vector_constructor = functools.partial(NumpyVectorOverZn, n=n)
+        if sparse.issparse(A):
+            self.A = A
+        else:
+            self.A = sparse.csc_matrix(A)
+        self.A = _scipy_sparse_mod(A,2)
+
+class GenericVector(object):
+    def __getitem__(self, i):
+        if  isiterable_or_slice(i):
+            return self._constructor(self.v[i])
+        else:
+            return self.v[i]
+
+    def __setitem__(self, i, x):
+        if isinstance(x, GenericVector):
+            self.v[i] = x.v
+        else:
+            self.v[i] = x
+
+    def __neg__(self):
+        return self._constructor(-self.v)
+
+class SageVector(GenericVector):
+    def __init__(self, v):
+        self.v = v
+
+    def to_sagedense(self):
+        return self
+
+    def to_numpydense(self):
+        return NumpyVectorOverRing(self.v.numpy(dtype=numpy_dtype_for_ring(self.ring)),
+            ring=self.ring)
+
+    @property
+    def ring(self):
+        return self.v.base_ring()
+
+class NumpyVectorOverRingGeneric(GenericVector):
+    def __init__(self):
         raise NotImplementedError
 
-    def eye_like(self, n):
-        return self._canonicalize(numpy.eye(n, dtype=self.A.dtype))
+    def to_sagedense(self):
+        return SageVector(vector(self.ring, self.v))
 
-    def zeros_like(self, shape):
-        return self._canonicalize(numpy.zeros(n, dtype=self.A.dtype))
+    def to_numpydense(self):
+        return self
 
-class NumpyMatrixOverZ(NumpyMatrixOverRingTemplate):
-    def __init__(self, A):
+    def convert_to_like_self(self,a):
+        return a.to_numpydense()
+
+    def count_nonzero(self):
+        return numpy.count_nonzero(self.v)
+
+class NumpyVectorOverZ(NumpyVectorOverRingGeneric):
+    def __init__(self, v):
         self.ring = ZZ
-        self.A = A
+        self.v = numpy.array(v)
+        self._constructor = NumpyVectorOverZ
 
-    def _canonicalize(self, A):
-        return NumpyMatrixOverZ(A)
-
-class NumpyMatrixOverZn(NumpyMatrixOverRingTemplate):
-    def __init__(self, A, n):
+class NumpyVectorOverZn(NumpyVectorOverRingGeneric):
+    def __init__(self, v, n):
         self.ring = Integers(n)
-        self.A = A % n
+        self.v = numpy.array(v) % n
         self.n = n
-
-    def _canonicalize(self, A):
-        return NumpyMatrixOverZn(A, self.n)
-
-class ScipySparseMatrixOverZ(ScipySparseMatrixOverRingTemplate):
-    def __init__(self, A):
-        self.ring = ZZ
-        self.A = A
-        self.bmat = sparse.bmat
-
-    def _canonicalize(self, A):
-        return ScipySparseMatrixOverZ(A)
-
-class ScipySparseMatrixOverZn(ScipySparseMatrixOverRingTemplate):
-    def __init__(self, A, n):
-        self.ring = Integers(n)
-        self.A = A % n
-        self.n = n
-
-    def _canonicalize(self, A):
-        return ScipySparseMatrixOverZn(A, self.n)
+        self._constructor = functools.partial(NumpyVectorOverZn, n = n)
 
 #class ScipyVectorOverRingTemplate(object):
 #    def __init__(self, v, ring, numpy_dtype):
@@ -162,25 +315,61 @@ class ScipySparseMatrixOverZn(ScipySparseMatrixOverRingTemplate):
 #    def toscipy(self,A):
 #        return numpy.array(A.numpy(dtype=self.numpy_dtype))
 
-class SageDenseMatrix(object):
+def solve_matrix_equation_with_constraint(A, subs_indices, xconstr):
+    """ Solves the equation Ax = 0, given the constraint that x[i] = xconstr[i]
+    for i in subs_indices. """ 
+
+    subs_indices_list = list(subs_indices)
+    subs_indices_set = frozenset(subs_indices)
+
+    notsubs_indices_set = frozenset(xrange(A.shape[1])) - subs_indices_set
+    notsubs_indices_list = list(notsubs_indices_set)
+
+    xconstr_reduced = xconstr[subs_indices_list]
+
+    A_reduced_1 = A[:,notsubs_indices_list]
+    A_reduced_2 = A[:,subs_indices_list]
+
+    b = -A_reduced_2.dot(xconstr_reduced)
+
+    sol = A_reduced_1.solve_right(b)
+
+    sol_full = A.factory().zero_vector(A.shape[1])
+    sol_full[notsubs_indices_list] = sol
+    sol_full[subs_indices_list] = xconstr[subs_indices_list]
+
+    assert(A.dot(sol_full).count_nonzero() == 0)
+    return sol_full
+
+from sage.matrix.matrix_dense import Matrix_dense
+class SageDenseMatrix(GenericMatrix):
     def __init__(self,A):
+        if not isinstance(A, Matrix_dense):
+            raise TypeError, "Input to SageDenseMatrix constructor must be a sage dense matrix object."
         self.A = A
+        self._constructor = SageDenseMatrix
 
     def to_numpydense(self):
-        return NumpyMatrixOverRing(numpy.array(self.A.numpy(dtype=numpy_dtype_for_ring(self.A.base_ring()))),
-            ring=self.A.base_ring())
+        return NumpyMatrixOverRing(numpy.array(self.A.numpy(dtype=numpy_dtype_for_ring(self.ring))),
+            ring=self.ring)
 
     def to_scipysparse(self):
-        raise NotImplementedError
+        return self.to_numpydense().to_scipysparse()
 
     def to_sagedense(self):
         return self
+
+    def convert_to_like_self(self):
+        return self.to_sagedense()
 
     @property
     def ring(self):
         return self.A.base_ring()
 
-    def right_kernel_matrix(A):
+    def solve_right(self, b):
+        return SageVector(self.A.solve_right(b.v))
+
+    def right_kernel_matrix(self):
         # Flint is a lot faster than the default algorithm when working over the
         # integers.
         if self.ring is ZZ:
@@ -194,12 +383,39 @@ class SageDenseMatrix(object):
     def pivots(self):
         return self.A.pivots()
 
-from sage.rings.finite_rings.integer_mod_ring import IntegerModRing_generic
+    def elementary_divisors(self):
+        return self.A.elementary_divisors()
+
+
+def numpy_dtype_for_ring(ring):
+    if ring is ZZ:
+        return int
+    elif isinstance(ring, IntegerModRing_generic):
+        return int
+    else:
+        raise NotImplementedError
+
 def NumpyMatrixOverRing(A, ring):
     if ring is ZZ:
         return NumpyMatrixOverZ(A)
     elif isinstance(ring, IntegerModRing_generic):
         return NumpyMatrixOverZn(A, ring.order())
+    else:
+        raise NotImplementedError
+
+def NumpyVectorOverRing(v, ring):
+    if ring is ZZ:
+        return NumpyVectorOverZ(v)
+    elif isinstance(ring, IntegerModRing_generic):
+        return NumpyVectorOverZn(v, ring.order())
+    else:
+        raise NotImplementedError
+
+def ScipySparseMatrixOverRing(A, ring):
+    if ring is ZZ:
+        return ScipySparseMatrixOverZ(A)
+    elif isinstance(ring, IntegerModRing_generic):
+        return ScipySparseMatrixOverZn(A, ring.order())
     else:
         raise NotImplementedError
 
@@ -224,7 +440,7 @@ def NumpyMatrixOverRing(A, ring):
 #
 #    return [ v for v in intersection.basis() ]
 
-def image_of_constrained_subspace(A,B,encoder):
+def image_of_constrained_subspace(A,B):
     """ Finds the basis matrix for the space of vectors v such that there exists
     x with Bx = 0 such that Ax = v. """
 
@@ -244,8 +460,8 @@ def image_of_constrained_subspace(A,B,encoder):
     #return [ v[0:A.shape[0]] for v in column_space_intersection_with_other_space(AB, target_space_basis,
     #            encoder) ]
 
-    K = B.right_kernel_matrix().to_numpydense()
+    K = B.right_kernel_matrix()
     AK = A.dot(K.to_numpydense())
-    C = AK.column_space_matrix()
+    return AK.column_space_matrix()
     #scipy.io.savemat('K.mat', {'B': B, 'K': K, 'C': C})
-    return [C[:,i].flat for i in xrange(C.shape[1])]
+    #return [C[:,i].flat for i in xrange(C.shape[1])]

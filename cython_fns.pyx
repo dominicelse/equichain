@@ -7,6 +7,9 @@ cimport cython
 import numpy as np
 from cpython.object cimport Py_EQ,Py_NE
 from libc.stdlib cimport calloc,free
+from chaincplx import linalg
+
+from sage.all import ZZ
 
 cdef enum:
     strideprime = 997
@@ -319,4 +322,4 @@ def get_group_coboundary_matrix(cells, int n, G):
 
     A = sparse.coo_matrix((coo_entries,(coo_i,coo_j)), (indexer_out.total_dim(),
         indexer_in.total_dim()), dtype=int)
-    return A.tocsc()
+    return linalg.ScipySparseMatrixOverRing(A.tocsc(), ring=ZZ)

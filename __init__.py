@@ -575,38 +575,6 @@ def get_stabilizer_group(cell,G):
 #    A = scipy_sparse_matrix_to_sage(over_ring, A)
 #    return A.solve_right(b).numpy(dtype=int)
 
-def solve_matrix_equation_with_constraint(A, subs_indices, xconstr, over_ring=ZZ):
-    """ Solves the equation Ax = 0, given the constraint that x[i] = xconstr[i]
-    for i in subs_indices. """ 
-
-    subs_indices_list = list(subs_indices)
-    subs_indices_set = frozenset(subs_indices)
-
-    notsubs_indices_set = frozenset(xrange(A.shape[1])) - subs_indices_set
-    notsubs_indices_list = list(notsubs_indices_set)
-
-    xconstr_reduced = xconstr[subs_indices_list]
-
-    print "slicing"
-    A_reduced_1 = A[:,notsubs_indices_list]
-    A_reduced_2 = A[:,subs_indices_list]
-
-    b = -A_reduced_2.dot(xconstr_reduced)
-
-    print "starting conversion"
-    A_reduced_1 = scipy_sparse_matrix_to_sage(over_ring, A_reduced_1)
-    b = vector(over_ring, b)
-
-    print "starting solve"
-    sol = A_reduced_1.solve_right(b).numpy()
-
-    sol_full = numpy.empty(A.shape[1], dtype=int)
-    sol_full[notsubs_indices_list] = sol
-    sol_full[subs_indices_list] = xconstr[subs_indices_list]
-
-    assert(numpy.count_nonzero(A.dot(sol_full) % 2) == 0)
-    return sol_full
-
 def scipy_sparse_matrix_to_sage(R, M):
     if len(M.shape) != 2:
         raise ValueError, "Need to start with rank-2 array"
@@ -719,7 +687,7 @@ def get_group_coboundary_matrix(cells, n,G, resolution='cython_bar'):
                     )
                 A[build_index(ci, gi, ci, a)] += (-1)**i
 
-    return A.tocsc()
+    return ScipySparseMatrixOverRing(A.tocsc(), ring=ZZ)
 
 class ComplexNotInvariantError(Exception):
     pass
@@ -945,31 +913,32 @@ def test_has_solution(fn):
             raise e
     return True
 
-def trivialized_by_E3_space(cplx,n,k,G,encoder, resolution):
+def trivialized_by_E3_space(cplx,n,k,G,ring, resolution):
     d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G, resolution=resolution)
     d2 = cplx.get_boundary_matrix_group_cochain(n=(n+1), k=(k+2), G=G, resolution=resolution)
     delta1 = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G, resolution=resolution)
     delta2 = cplx.get_group_coboundary_matrix(n=(n+1), k=(k+2), G=G, resolution=resolution)
 
-    z = encoder.numpy_zeros((d1.shape[0], delta2.shape[1]))
-    A = numpy.bmat([[d1.toarray(),z]])
+    d1,d2,delta1,delta2 = (x.change_ring(ring) for x in (d1,d2,delta1,delta2))
+    factory = d1.factory()
 
-    B = sparse.bmat([[None, delta2],
+    z = factory.zeros((d1.shape[0], delta2.shape[1]))
+    A = factory.bmat([[d1,z]])
+
+    B = factory.bmat([[None, delta2],
                      [delta1, -d2]])
-    B = B.toarray()
 
-    return image_of_constrained_subspace(A,B,encoder)
+    return image_of_constrained_subspace(A,B)
 
-
-def trivialized_by_E3_but_not_E2(cplx,n,k,G,encoder):
-    triv_by_E3 = trivialized_by_E3_space(cplx,n,k,G,encoder)
-
-    ret = []
-    
-    for v in triv_by_E3:
-        if not test_has_solution(lambda: find_E2_trivializer(cplx,v,n,k,G,encoder)):
-            ret.append(v)
-    return ret
+#def trivialized_by_E3_but_not_E2(cplx,n,k,G,encoder):
+#    triv_by_E3 = trivialized_by_E3_space(cplx,n,k,G,encoder)
+#
+#    ret = []
+#    
+#    for v in triv_by_E3:
+#        if not test_has_solution(lambda: find_E2_trivializer(cplx,v,n,k,G,encoder)):
+#            ret.append(v)
+#    return ret
 
 #def trivialized_by_E3_space(cplx,n,k,G,field, method='column_space_dense', use_z2_optimization=True):
 #    if use_z2_optimization and field in (GF(2), Integers(2)) and method == 'column_space_dense':
@@ -1011,25 +980,32 @@ def trivialized_by_E3_but_not_E2(cplx,n,k,G,encoder):
 #    else:
 #        raise ValueError, "Undefined method."
 
-def group_cohomology(G,n, resolution, encoder):
+def group_cohomology(G,n, resolution, ring):
     d1 = get_group_coboundary_matrix([TrivialPermutee()], n, G, resolution)
     d2 = get_group_coboundary_matrix([TrivialPermutee()], n-1, G, resolution)
 
-    return kernel_mod_image(d1.toarray(), d2.toarray(), encoder)
+    d1,d2 = (x.change_ring(ring) for x in (d1, d2))
 
-def trivialized_by_E2_space(cplx,n,k,G,encoder,resolution):
+    return kernel_mod_image(d1,d2)
+
+def trivialized_by_E2_space(cplx,n,k,G,ring,resolution):
     d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G, resolution=resolution)
     delta1 = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G, resolution=resolution)
 
-    return image_of_constrained_subspace(d1.toarray(), delta1.toarray(), encoder)
+    d1,delta1 = (x.change_ring(ring) for x in (d1,delta1))
 
-def find_E2_trivializer(cplx, a, n, k, G, encoder):
+    return image_of_constrained_subspace(d1, delta1)
+
+def find_E2_trivializer(cplx, a, n, k, G, ring):
     d = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G)
     delta = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G)
 
-    A = sparse.bmat([[d],[delta]])
-    b = numpy.bmat([a,numpy.zeros(A.shape[0]-len(a))]).flat
-    return encoder.solve_matrix_equation(A,b)
+    d,delta = (x.change_ring(ring) for x in (d,delta))
+
+    factory = d.factory()
+    A = factory.bmat([[d],[delta]])
+    b = factory.concatenate_vectors(a,factory.zero_vector(A.shape[0]-len(a)))
+    return A.solve_right(b)
 
 def find_E3_trivializer(cplx, a, n, k, G, encoder):
     # a is a k-chain, n-group cochain
@@ -1039,12 +1015,16 @@ def find_E3_trivializer(cplx, a, n, k, G, encoder):
     delta1 = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G)
     delta2 = cplx.get_group_coboundary_matrix(n=(n+1), k=(k+2), G=G)
 
-    A = sparse.bmat([[d1,   None],
+    d1,d2,delta1,delta2 = (x.change_ring(ring) for x in (d1,d2,delta1,delta2))
+
+    factory = d1.factory()
+
+    A = factory.bmat([[d1,   None],
                      [None, delta2],
                      [delta1, -d2]])
-    b = numpy.bmat([a,numpy.zeros(A.shape[0]-len(a))]).flat
+    b = factory.bmat([a,numpy.zeros(A.shape[0]-len(a))]).flat
 
-    return encoder.solve_matrix_equation(A,b)
+    return A.solve_right(b)
 
 def gap_space_group_translation_subgroup(G,n):
     gap_fn = gap("""function(G,n)

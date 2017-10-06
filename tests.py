@@ -36,7 +36,7 @@ class ComplexWithGroupActionGenericTests(object):
                 D2 = self.cplx.get_group_coboundary_matrix(n=n,k=k,G=self.G,
                         resolution=chaincplx.resolutions.BarResolution(self.G))
                 self.assertEqual(D1.shape, D2.shape)
-                self.assertEqual( (D1 != D2).nnz, 0 )
+                self.assertTrue(D1.equals(D2))
 
     def get_cocycle_soln(self,k,n,cell_index):
         cell = self.cplx.cells[k][cell_index]
@@ -45,16 +45,17 @@ class ComplexWithGroupActionGenericTests(object):
         indexer_in = self.cplx.get_chain_indexer(G=self.G,k=k,n=n)
         
         A = self.cplx.get_group_coboundary_matrix(G=self.G,k=k,n=n)
+        A = A.change_base_ring(self.R)
             
         subs_indices = []
-        xconstr = numpy.zeros(indexer_in.total_dim(), dtype=int)
+        xconstr = A.factory().zero_vector(indexer_in.total_dim())
         xconstr[indexer_in( (s.toindex(),), cell_index)] = 1
         subs_indices += [indexer_in( (s.toindex(),), cell_index)]
 
         for ci in xrange(len(self.cplx.cells[k])):
             xconstr[indexer_in( (0,), ci)] = 0
 
-        soln = chaincplx.solve_matrix_equation_with_constraint(A, subs_indices, xconstr, over_ring=self.R) 
+        soln = chaincplx.solve_matrix_equation_with_constraint(A, subs_indices, xconstr)
 
         return soln
 
@@ -131,13 +132,13 @@ class TwistGrpTests(ComplexWithGroupActionGenericTests, unittest.TestCase):
     def test_E2(self):
         a = numpy.array([1,1])
         self.assertFalse(
-                chaincplx.test_has_solution(lambda:chaincplx.find_E2_trivializer(self.cplx,a,n=0,k=0,G=self.G,ring=self.ring))
+                chaincplx.test_has_solution(lambda:chaincplx.find_E2_trivializer(self.cplx,a,n=0,k=0,G=self.G,ring=self.R))
                 )
 
     def test_E3(self):
         a = numpy.array([1,1])
         self.assertFalse(
-                chaincplx.test_has_solution(lambda:chaincplx.find_E3_trivializer(self.cplx,a,n=0,k=0,G=self.G,ring=self.ring))
+                chaincplx.test_has_solution(lambda:chaincplx.find_E3_trivializer(self.cplx,a,n=0,k=0,G=self.G,ring=self.R))
                 )
 
 def check_space_group(i, compute=True):
