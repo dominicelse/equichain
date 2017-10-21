@@ -45,7 +45,7 @@ class ComplexWithGroupActionGenericTests(object):
         indexer_in = self.cplx.get_chain_indexer(G=self.G,k=k,n=n)
         
         A = self.cplx.get_group_coboundary_matrix(G=self.G,k=k,n=n)
-        A = A.change_base_ring(self.R)
+        A = A.change_ring(self.R)
             
         subs_indices = []
         xconstr = A.factory().zero_vector(indexer_in.total_dim())
@@ -198,6 +198,7 @@ class SpaceGroupTests(unittest.TestCase):
         self.d = 3
         self.cplx = chaincplx.cubical_complex(self.d, [1]*self.d, [], with_midpoints=True, scale=2,
                 pointclass=chaincplx.IntegerPointInUniverse)
+        gap.load_package("hap")
 
     def test_somethings(self):
         expected_answers = {
