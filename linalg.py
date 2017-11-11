@@ -57,7 +57,7 @@ class GenericMatrix(object):
         return self.to_sagedense().elementary_divisors()
 
     def solve_right(self, v):
-        return v.convert_to_like_self(self.to_sagedense().solve_right(v.to_sagedense()))
+        return v.convert_to_like_self(self.to_sagedense().solve_right(v.to_sagedense().sageobj()))
 
     def __getitem__(self, i):
         if ( (isinstance(i, tuple) and any(isiterable_or_slice(x) for x in i)) or
@@ -265,6 +265,9 @@ class SageVector(GenericVector):
 
     def to_sagedense(self):
         return self
+
+    def sageobj(self):
+        return self.v
 
     def to_numpydense(self):
         return NumpyVectorOverRing(self.v.numpy(dtype=numpy_dtype_for_ring(self.ring)),
