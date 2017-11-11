@@ -57,7 +57,7 @@ class GenericMatrix(object):
         return self.to_sagedense().elementary_divisors()
 
     def solve_right(self, v):
-        return v.convert_to_like_self(self.to_sagedense().solve_right(v.to_sagedense().sageobj()))
+        return v.convert_to_like_self(self.to_sagedense().solve_right(v.to_sagedense()))
 
     def __getitem__(self, i):
         if ( (isinstance(i, tuple) and any(isiterable_or_slice(x) for x in i)) or
@@ -166,10 +166,13 @@ class NumpyMatrixOverRingGeneric(ScipyOrNumpyMatrixOverRingGeneric):
                 constructor=self._constructor)
 
     def to_sagedense(self):
-        nrows,ncols = self.A.shape
-        B = matrix(self.ring, nrows, ncols)
-        B.set_unsafe_from_numpy_int_array(self.A)
-        return SageDenseMatrix(B)
+        if patched_sage:
+            nrows,ncols = self.A.shape
+            B = matrix(self.ring, nrows, ncols)
+            B.set_unsafe_from_numpy_int_array(self.A)
+            return SageDenseMatrix(B)
+        else:
+            return SageDenseMatrix(matrix(self.ring, self.A))
 
 
     def to_numpydense(self):
