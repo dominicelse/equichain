@@ -1023,7 +1023,7 @@ def find_E3_trivializer(cplx, a, n, k, G, ring):
     A = factory.bmat([[d1,   None],
                      [None, delta2],
                      [delta1, -d2]])
-    b = factory.bmat([a,numpy.zeros(A.shape[0]-len(a))]).flat
+    b = factory.concatenate_vectors(a,factory.zero_vector(A.shape[0]-len(a)))
 
     return A.solve_right(b)
 

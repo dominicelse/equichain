@@ -118,8 +118,6 @@ class NumpyMatrixFactoryBase(object):
             dtype=self.numpy_dtype))
 
     def concatenate_vectors(self, a, b):
-        print type(a)
-        print type(b)
         return self.vector_constructor(numpy.concatenate((a.v,b.v)))
 
 class ScipySparseMatrixFactory(NumpyMatrixFactoryBase):
