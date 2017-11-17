@@ -870,7 +870,8 @@ class CellComplex(object):
             rank = G.size()**n
         else:
             rank = resolution.rank(n)
-        return ScipySparseMatrixOverZ(sparse.kron(A, sparse.eye(rank,dtype=int)))
+        return ScipySparseMatrixOverZ(sparse.kron(A,
+            sparse.eye(rank,dtype=int)).tocsc())
 
     #def get_boundary_matrix_group_cochain_2(self, k,n,G):
     #    A = self.get_boundary_matrix(k)
@@ -918,8 +919,6 @@ def trivialized_by_E3_space(cplx,n,k,G,ring, resolution):
     d2 = cplx.get_boundary_matrix_group_cochain(n=(n+1), k=(k+2), G=G, resolution=resolution)
     delta1 = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G, resolution=resolution)
     delta2 = cplx.get_group_coboundary_matrix(n=(n+1), k=(k+2), G=G, resolution=resolution)
-
-    print [ type(x) for x in (d1,d1,delta1,delta2) ]
 
     d1,d2,delta1,delta2 = (x.change_ring(ring) for x in (d1,d2,delta1,delta2))
     factory = d1.factory()

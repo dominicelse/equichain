@@ -59,7 +59,7 @@ class GenericMatrix(object):
         return self.to_sagedense().pivots()
 
     def column_space_matrix(self):
-        return self.A[:,self.pivots()]
+        return self._constructor(self.A[:,self.pivots()])
 
     def elementary_divisors(self):
         return self.to_sagedense().elementary_divisors()
@@ -78,8 +78,6 @@ class GenericMatrix(object):
         if isinstance(x, GenericMatrix):
             self.A[i] = x.A
         elif isinstance(x, GenericVector):
-            print len(x.v)
-            print len(i)
             self.A[i] = x.v
         else:
             self.A[i] = x
@@ -143,6 +141,12 @@ class ScipyOrNumpyMatrixOverRingGeneric(GenericMatrix):
             return self._vector_constructor(self.A.dot(b.v))
         else:
             return self._constructor(self.A.dot(b.A))
+
+    def nrows(self):
+        return self.A.shape[0]
+
+    def ncols(self):
+        return self.A.shape[1]
 
     @property
     def shape(self):
@@ -482,7 +486,7 @@ def image_of_constrained_subspace(A,B):
     #            encoder) ]
 
     K = B.right_kernel_matrix()
-    AK = A.dot(K.to_numpydense())
+    AK = A.dot(K)
     return AK.column_space_matrix()
     #scipy.io.savemat('K.mat', {'B': B, 'K': K, 'C': C})
     #return [C[:,i].flat for i in xrange(C.shape[1])]
