@@ -95,10 +95,17 @@ class NumpyMatrixFactoryBase(object):
         self.base_module = base_module
 
     def bmat(self, block):
-        ring = block[0][0].ring
+        ring = None
         for i in xrange(len(block)):
             for j in xrange(len(block[i])):
-                assert block[i][j].ring == ring
+                if block[i][j] is None:
+                    continue
+
+                if ring is None:
+                    ring = block[i][j].ring
+                else:
+                    assert block[i][j].ring == ring
+
                 block[i][j] = block[i][j].A
         return self.constructor(self.base_module.bmat(block))
 
