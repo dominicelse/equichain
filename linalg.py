@@ -12,6 +12,14 @@ except RuntimeError:
     warnings.warn("Could not load Magma. Falling back to Sage for all functionality.")
     use_magma = False
 
+# Check if patched sage
+A = matrix(ZZ, 1,1)
+if hasattr(A, 'set_unsafe_from_numpy_int_array'):
+    patched_sage = True
+else:
+    patched_sage = False
+    print "WARNING: patched Sage not found; performance will be much slower"
+
 def kernel_mod_image(d1,d2):
     # Returns the torsion coefficients of (ker d1)/(im d2), where d1 d2 = 0
 
