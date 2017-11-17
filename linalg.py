@@ -118,7 +118,9 @@ class NumpyMatrixFactoryBase(object):
             dtype=self.numpy_dtype))
 
     def concatenate_vectors(self, a, b):
-        return self.vector_constructor(numpy.concatenate(a,b))
+        print type(a)
+        print type(b)
+        return self.vector_constructor(numpy.concatenate((a.v,b.v)))
 
 class ScipySparseMatrixFactory(NumpyMatrixFactoryBase):
     def __init__(self, constructor, vector_constructor, numpy_dtype):
@@ -280,6 +282,9 @@ class GenericVector(object):
 
     def __neg__(self):
         return self._constructor(-self.v)
+
+    def __len__(self):
+        return len(self.v)
 
 class SageVector(GenericVector):
     def __init__(self, v):

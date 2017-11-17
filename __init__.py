@@ -911,7 +911,7 @@ def test_has_solution(fn):
         if e.args[0] == "matrix equation has no solutions":
             return False
         else:
-            raise e
+            raise
     return True
 
 def trivialized_by_E3_space(cplx,n,k,G,ring, resolution):

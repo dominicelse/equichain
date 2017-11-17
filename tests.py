@@ -1,6 +1,7 @@
 import unittest
 from sage.all import *
 import chaincplx
+import chaincplx.linalg
 import chaincplx.resolutions
 import numpy
 import itertools
@@ -130,13 +131,13 @@ class TwistGrpTests(ComplexWithGroupActionGenericTests, unittest.TestCase):
     #    self.assertTrue(numpy.array_equal(u,[0,0]))
 
     def test_E2(self):
-        a = numpy.array([1,1])
+        a = chaincplx.linalg.NumpyVectorOverZn(numpy.array([1,1]), 2)
         self.assertFalse(
                 chaincplx.test_has_solution(lambda:chaincplx.find_E2_trivializer(self.cplx,a,n=0,k=0,G=self.G,ring=self.R))
                 )
 
     def test_E3(self):
-        a = numpy.array([1,1])
+        a = chaincplx.linalg.NumpyVectorOverZn(numpy.array([1,1]), 2)
         self.assertFalse(
                 chaincplx.test_has_solution(lambda:chaincplx.find_E3_trivializer(self.cplx,a,n=0,k=0,G=self.G,ring=self.R))
                 )
