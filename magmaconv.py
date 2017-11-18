@@ -15,9 +15,12 @@ def printoptions(*args, **kwargs):
     finally: 
         numpy.set_printoptions(**original)
 
+from sage.rings.finite_rings.integer_mod_ring import IntegerModRing_generic
 def convert_sage_ring_to_magma(ring):
     if ring == ZZ:
         return magma.IntegerRing()
+    elif isinstance(ring, IntegerModRing_generic):
+        return magma.IntegerRing(ring.order())
     else:
         raise NotImplementedError
 
@@ -57,10 +60,10 @@ def magma_dense_matrix_from_numpy(A, ring):
 
     return magmaconv_cython.numpy_int_matrix_to_magma(A)
 
-def scipy_sparse_matrix_from_magma(A, dtype=int, sparse_matrix_class=sparse.coo_matrix):
+def scipy_sparse_matrix_from_magma(A, sparse_matrix_class=sparse.coo_matrix):
     magmadata = [ tuple(x) for x in magma.ElementToSequence(A) ]
 
-    data = numpy.empty( len(magmadata), dtype=dtype)
+    data = numpy.empty( len(magmadata), dtype=int)
     i = numpy.empty( len(magmadata), dtype=int)
     j = numpy.empty( len(magmadata), dtype=int)
     for k,tup in enumerate(magmadata):
@@ -74,9 +77,8 @@ def scipy_sparse_matrix_from_magma(A, dtype=int, sparse_matrix_class=sparse.coo_
         A = Acoo
     else:
         A = sparse_matrix_class(Acoo)
-        
-def numpy_dense_matrix_from_magma(A,ring):
-    if ring != ZZ:
-        raise NotImplementedError
 
+    return A
+        
+def numpy_dense_matrix_from_magma(A):
     return magmaconv_cython.magma_to_numpy_int_matrix(A)

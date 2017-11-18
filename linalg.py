@@ -63,8 +63,10 @@ class GenericMatrix(object):
     def right_kernel_matrix(self):
         if right_kernel_use == 'sage':
             conv = self.to_sagedense()
-        else:
+        elif right_kernel_use == 'magma':
             conv = self.to_magma()
+        else:
+            raise NotImplementedError
         return self.convert_to_like_self(conv.right_kernel_matrix_())
 
     def pivots(self):
@@ -481,7 +483,7 @@ class MagmaSparseMatrix(MagmaMatrix):
 
     def to_scipysparse(self):
         return ScipySparseMatrixOverRing(
-                magmaconv.scipy_sparse_matrix_from_magma(self.A,self.ring),
+                magmaconv.scipy_sparse_matrix_from_magma(self.A),
                 self.ring)
 
     @property
