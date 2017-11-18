@@ -31,7 +31,6 @@ class AutoIncrList(object):
         self.i = 0
 
     def append(self,val):
-        print self.i
         self.data[self.i] = val
         self.i += 1
 
@@ -52,7 +51,8 @@ def magma_sparse_matrix_from_scipy(A, ring):
             magmadata.append(indx)
             magmadata.append(val)
 
-    return magma.SparseMatrix(ring, A.shape[0], A.shape[1], magmadata.data)
+    s = str(magmadata.data)
+    return magma.SparseMatrix(ring, A.shape[0], A.shape[1], magma(s))
 
 def magma_dense_matrix_from_numpy(A, ring):
     ring = convert_sage_ring_to_magma(ring)

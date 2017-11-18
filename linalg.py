@@ -1,7 +1,7 @@
 from __future__ import division
 from sage.all import *
 import numpy
-from chaincplx import magma_fns
+from chaincplx import magmaconv
 from scipy import sparse
 import functools
 
@@ -54,7 +54,7 @@ class GenericMatrix(object):
     def __repr__(self):
         return repr(self.A)
 
-    def to_magma():
+    def to_magma(self):
         if self.density == 'dense':
             return self.to_magmadense()
         else:
@@ -67,7 +67,7 @@ class GenericMatrix(object):
             conv = self.to_magma()
         else:
             raise NotImplementedError
-        return self.convert_to_like_self(conv.right_kernel_matrix_())
+        return self.convert_to_like_self_preserve_density(conv.right_kernel_matrix_())
 
     def pivots(self):
         return self.to_sagedense().pivots()
@@ -153,12 +153,6 @@ class ScipyOrNumpyMatrixOverRingGeneric(GenericMatrix):
     def __init__(self):
         raise NotImplementedError
 
-    def dot(self, b):
-        if isinstance(b, GenericVector):
-            return self._vector_constructor(self.A.dot(b.v))
-        else:
-            return self._constructor(self.A.dot(b.A))
-
     def nrows(self):
         return self.A.shape[0]
 
@@ -179,11 +173,28 @@ class ScipySparseMatrixOverRingGeneric(ScipyOrNumpyMatrixOverRingGeneric):
     def to_sagedense(self):
         return self.to_numpydense().to_sagedense()
 
+    def dot(self, b):
+        assert self.ring == b.ring
+
+        if isinstance(b, GenericVector):
+            return self._vector_constructor(self.A.dot(b.v))
+        elif isinstance(b, ScipySparseMatrixOverRingGeneric):
+            return self._constructor(self.A.dot(b.A))
+        elif isinstance(b, NumpyMatrixOverRingGeneric):
+            return self.to_numpydense().dot(b)
+        else:
+            raise NotImplementedError
+
     def to_numpydense(self):
         return NumpyMatrixOverRing(self.A.toarray(), self.ring)
 
     def to_scipysparse(self):
         return self
+
+    def to_magmasparse(self):
+        return MagmaSparseMatrix(magmaconv.magma_sparse_matrix_from_scipy(self.A,
+            self.ring),
+            self.ring)
 
     def convert_to_like_self(self,a):
         return a.to_scipysparse()
@@ -223,6 +234,10 @@ class NumpyMatrixOverRingGeneric(ScipyOrNumpyMatrixOverRingGeneric):
     def to_numpydense(self):
         return self
 
+    def to_magmadense(self):
+        return MagmaDenseMatrix(magmaconv.magma_dense_matrix_from_numpy(self.A,
+            self.ring), self.ring)
+
     def to_scipysparse(self):
         return ScipySparseMatrixOverRing(sparse.csc_matrix(self.A), ring=self.ring)
 
@@ -238,6 +253,14 @@ class NumpyMatrixOverRingGeneric(ScipyOrNumpyMatrixOverRingGeneric):
     @property
     def density(self):
         return "dense"
+
+    def dot(self, b):
+        assert self.ring == b.ring
+
+        if isinstance(b, NumpyVectorOverRingGeneric):
+            return NumpyVectorOverRing(numpy.dot(self.A, b.v), self.ring)
+        else:
+            return NumpyMatrixOverRing(numpy.dot(self.A, b.A), self.ring)
 
 from sage.rings.finite_rings.integer_mod_ring import IntegerModRing_generic
 
@@ -427,6 +450,10 @@ class SageDenseMatrix(GenericMatrix):
     def solve_right(self, b):
         return SageVector(self.A.solve_right(b.v))
 
+    @property
+    def density(self):
+        return "dense"
+
     def right_kernel_matrix_(self):
         #print "right_kernel_matrix:", (self.A.nrows(), self.A.ncols())
         
@@ -453,7 +480,12 @@ class MagmaMatrix(GenericMatrix):
         raise NotImplementedError
 
     def right_kernel_matrix_(self):
-        return MagmaDenseMatrix( magma.KernelMatrix(self.A), self.ring)
+        print "Calling magma right_kernel_matrix_:", self.density
+        # Note that Magma uses the opposite ordering, hence all the transposes
+        ret = MagmaDenseMatrix( 
+                magma.Transpose(magma.KernelMatrix(magma.Transpose(self.A))), self.ring)
+        print "Finished magma right_kernel_matrix_"
+        return ret
 
 class MagmaDenseMatrix(MagmaMatrix):
     def __init__(self,A,ring):
@@ -462,7 +494,7 @@ class MagmaDenseMatrix(MagmaMatrix):
         self._constructor = functools.partial(MagmaDenseMatrix, ring=ring)
 
     def to_numpydense(self):
-        return NumpyMatrixOverRing(magmaconv.numpy_dense_matrix_from_magma(self.A,self.ring),
+        return NumpyMatrixOverRing(magmaconv.numpy_dense_matrix_from_magma(self.A),
             self.ring)
 
     def to_sagedense(self):
@@ -566,6 +598,7 @@ def image_of_constrained_subspace(A,B):
 
     K = B.right_kernel_matrix()
     AK = A.dot(K)
+
     return AK.column_space_matrix()
     #scipy.io.savemat('K.mat', {'B': B, 'K': K, 'C': C})
     #return [C[:,i].flat for i in xrange(C.shape[1])]

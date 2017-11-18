@@ -5,6 +5,7 @@ import chaincplx.linalg
 import chaincplx.resolutions
 import numpy
 import itertools
+import cProfile
 
 def make_twistgrp():
     eye = matrix.identity(4)
@@ -242,7 +243,8 @@ class SpaceGroupTests(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main()
+    #unittest.main()
+    cProfile.run('unittest.main()', filename='profile.txt')
     #a = TwistGrpTests()
     #a.setUp()
     #a.test_cocycle_soln()
