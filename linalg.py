@@ -480,11 +480,11 @@ class MagmaMatrix(GenericMatrix):
         raise NotImplementedError
 
     def right_kernel_matrix_(self):
-        print "Calling magma right_kernel_matrix_:", self.density
+        #print "Calling magma right_kernel_matrix_:", self.density
         # Note that Magma uses the opposite ordering, hence all the transposes
         ret = MagmaDenseMatrix( 
                 magma.Transpose(magma.KernelMatrix(magma.Transpose(self.A))), self.ring)
-        print "Finished magma right_kernel_matrix_"
+        #print "Finished magma right_kernel_matrix_"
         return ret
 
 class MagmaDenseMatrix(MagmaMatrix):
