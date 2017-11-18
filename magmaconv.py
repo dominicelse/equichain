@@ -3,6 +3,18 @@ from scipy import sparse
 import itertools
 import numpy
 
+import contextlib
+import magmaconv_cython
+
+@contextlib.contextmanager
+def printoptions(*args, **kwargs):
+    original = numpy.get_printoptions()
+    numpy.set_printoptions(*args, **kwargs)
+    try:
+        yield
+    finally: 
+        numpy.set_printoptions(**original)
+
 def convert_sage_ring_to_magma(ring):
     if ring == ZZ:
         return magma.IntegerRing()
@@ -23,7 +35,7 @@ class AutoIncrList(object):
     def finished():
         assert self.i == self.totallen
 
-def magma_sparse_matrix(A, ring):
+def magma_sparse_matrix_from_scipy(A, ring):
     ring = convert_sage_ring_to_magma(ring)
 
     A = A.tocsr()
@@ -39,7 +51,13 @@ def magma_sparse_matrix(A, ring):
 
     return magma.SparseMatrix(ring, A.shape[0], A.shape[1], magmadata.data)
 
-def scipy_sparse_matrix(A, dtype=int, sparse_matrix_class=sparse.coo_matrix):
+def magma_dense_matrix_from_numpy(A, ring):
+    if ring != ZZ:
+        raise NotImplementedError
+
+    return magmaconv_cython.numpy_int_matrix_to_magma(A)
+
+def scipy_sparse_matrix_from_magma(A, dtype=int, sparse_matrix_class=sparse.coo_matrix):
     magmadata = [ tuple(x) for x in magma.ElementToSequence(A) ]
 
     data = numpy.empty( len(magmadata), dtype=dtype)
@@ -53,6 +71,12 @@ def scipy_sparse_matrix(A, dtype=int, sparse_matrix_class=sparse.coo_matrix):
     Acoo = sparse.coo_matrix((data, (i,j)), (magma.Nrows(A), magma.Ncols(A)))
 
     if sparse_matrix_class is sparse.coo_matrix:
-        return Acoo
+        A = Acoo
     else:
-        return sparse_matrix_class(Acoo)
+        A = sparse_matrix_class(Acoo)
+        
+def numpy_dense_matrix_from_magma(A,ring):
+    if ring != ZZ:
+        raise NotImplementedError
+
+    return magmaconv_cython.magma_to_numpy_int_matrix(A)

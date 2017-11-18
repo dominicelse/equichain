@@ -42,6 +42,8 @@ def isiterable_or_slice(i):
     except TypeError:
         return isinstance(i,slice)
 
+right_kernel_use = 'sage'
+
 class GenericMatrix(object):
     def __init__(self):
         raise NotImplementedError
@@ -52,14 +54,27 @@ class GenericMatrix(object):
     def __repr__(self):
         return repr(self.A)
 
+    def to_magma():
+        if self.density == 'dense':
+            return self.to_magmadense()
+        else:
+            return self.to_magmasparse()
+
     def right_kernel_matrix(self):
-        return self.convert_to_like_self(self.to_sagedense().right_kernel_matrix())
+        if right_kernel_use == 'sage':
+            conv = self.to_sagedense()
+        else:
+            conv = self.to_magma()
+        return self.convert_to_like_self(conv.right_kernel_matrix_())
 
     def pivots(self):
         return self.to_sagedense().pivots()
 
     def column_space_matrix(self):
-        return self._constructor(self.A[:,self.pivots()])
+        #print "column_space_matrix:", self.A.shape
+        ret = self._constructor(self.A[:,self.pivots()])
+        #print "column_space_matrix: done" 
+        return ret
 
     def elementary_divisors(self):
         return self.to_sagedense().elementary_divisors()
@@ -152,6 +167,12 @@ class ScipyOrNumpyMatrixOverRingGeneric(GenericMatrix):
     def shape(self):
         return self.A.shape
 
+    def convert_to_like_self_preserve_density(self,a):
+        if a.density == 'sparse':
+            return a.to_scipysparse()
+        else:
+            return a.to_numpydense()
+
 class ScipySparseMatrixOverRingGeneric(ScipyOrNumpyMatrixOverRingGeneric):
     def to_sagedense(self):
         return self.to_numpydense().to_sagedense()
@@ -176,6 +197,10 @@ class ScipySparseMatrixOverRingGeneric(ScipyOrNumpyMatrixOverRingGeneric):
     def equals(self, b):
         return self.shape == b.shape and len((self.A != b.A).nonzero()[0]) == 0
 
+    @property
+    def density(self):
+        return "sparse"
+
 class NumpyMatrixOverRingGeneric(ScipyOrNumpyMatrixOverRingGeneric):
     def __init__(self):
         raise NotImplementedError
@@ -193,7 +218,6 @@ class NumpyMatrixOverRingGeneric(ScipyOrNumpyMatrixOverRingGeneric):
         else:
             return SageDenseMatrix(matrix(self.ring, self.A))
 
-
     def to_numpydense(self):
         return self
 
@@ -208,6 +232,10 @@ class NumpyMatrixOverRingGeneric(ScipyOrNumpyMatrixOverRingGeneric):
 
     def equals(self, b):
         return numpy.array_equal(self.A, self.b.A)
+
+    @property
+    def density(self):
+        return "dense"
 
 from sage.rings.finite_rings.integer_mod_ring import IntegerModRing_generic
 
@@ -397,7 +425,9 @@ class SageDenseMatrix(GenericMatrix):
     def solve_right(self, b):
         return SageVector(self.A.solve_right(b.v))
 
-    def right_kernel_matrix(self):
+    def right_kernel_matrix_(self):
+        #print "right_kernel_matrix:", (self.A.nrows(), self.A.ncols())
+        
         # Flint is a lot faster than the default algorithm when working over the
         # integers.
         if self.ring is ZZ:
@@ -406,6 +436,8 @@ class SageDenseMatrix(GenericMatrix):
             kwargs = dict()
 
         ret = SageDenseMatrix(self.A.right_kernel_matrix(basis='computed', **kwargs).transpose())
+
+        #print "right_kernel_matrix: done"
         return ret
 
     def pivots(self):
@@ -413,6 +445,48 @@ class SageDenseMatrix(GenericMatrix):
 
     def elementary_divisors(self):
         return self.A.elementary_divisors()
+
+class MagmaMatrix(GenericMatrix):
+    def __init__(self):
+        raise NotImplementedError
+
+    def right_kernel_matrix_(self):
+        return MagmaDenseMatrix( magma.KernelMatrix(self.A), self.ring)
+
+class MagmaDenseMatrix(MagmaMatrix):
+    def __init__(self,A,ring):
+        self.A = A
+        self.ring = ring
+        self._constructor = functools.partial(MagmaDenseMatrix, ring=ring)
+
+    def to_numpydense(self):
+        return NumpyMatrixOverRing(magmaconv.numpy_dense_matrix_from_magma(self.A,self.ring),
+            self.ring)
+
+    def to_sagedense(self):
+        return self.to_numpydense().to_sagedense()
+
+    def convert_to_like_self(self,obj):
+        return obj.to_magmadense()
+
+    @property
+    def density(self):
+        return "dense"
+
+class MagmaSparseMatrix(MagmaMatrix):
+    def __init__(self,A,ring):
+        self.A = A
+        self.ring = ring
+        self._constructor = functools.partial(MagmaSparseMatrix, ring=ring)
+
+    def to_scipysparse(self):
+        return ScipySparseMatrixOverRing(
+                magmaconv.scipy_sparse_matrix_from_magma(self.A,self.ring),
+                self.ring)
+
+    @property
+    def density(self):
+        return "sparse"
 
 
 def numpy_dtype_for_ring(ring):
