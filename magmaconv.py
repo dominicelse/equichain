@@ -55,10 +55,8 @@ def magma_sparse_matrix_from_scipy(A, ring):
     return magma.SparseMatrix(ring, A.shape[0], A.shape[1], magmadata.data)
 
 def magma_dense_matrix_from_numpy(A, ring):
-    if ring != ZZ:
-        raise NotImplementedError
-
-    return magmaconv_cython.numpy_int_matrix_to_magma(A)
+    ring = convert_sage_ring_to_magma(ring)
+    return magmaconv_cython.numpy_int_matrix_to_magma(A,ring)
 
 def scipy_sparse_matrix_from_magma(A, sparse_matrix_class=sparse.coo_matrix):
     magmadata = [ tuple(x) for x in magma.ElementToSequence(A) ]

@@ -42,7 +42,7 @@ def isiterable_or_slice(i):
     except TypeError:
         return isinstance(i,slice)
 
-right_kernel_use = 'sage'
+right_kernel_use = 'magma'
 
 class GenericMatrix(object):
     def __init__(self):
