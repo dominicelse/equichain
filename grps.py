@@ -82,9 +82,14 @@ class GapAffineQuotientGroup(object):
     def identity(self):
         return GapAffineQuotientGroupElement(self, self.sage_quotient_grp.identity())
 
-    def __init__(self, G,N, scale=1):
-        self.homo_to_factor = gap.NaturalHomomorphismByNormalSubgroup(G,N)
-        quotient_group = gap.ImagesSource(self.homo_to_factor)
+    def __init__(self, G, N=None, scale=1):
+        if N is None:
+            quotient_group = gap.PointGroup(G)
+            self.homo_to_factor = gap.PointHomomorphism(G)
+        else:
+            self.homo_to_factor = gap.NaturalHomomorphismByNormalSubgroup(G,N)
+            quotient_group = gap.ImagesSource(self.homo_to_factor)
+
         iso_to_perm = gap.IsomorphismPermGroup(quotient_group)
         self.iso_to_perm_inverse = gap.InverseGeneralMapping(iso_to_perm)
         self.gap_quotient_grp = gap.Image(iso_to_perm)

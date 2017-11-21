@@ -143,38 +143,6 @@ class TwistGrpTests(ComplexWithGroupActionGenericTests, unittest.TestCase):
                 chaincplx.test_has_solution(lambda:chaincplx.find_E3_trivializer(self.cplx,a,n=0,k=0,G=self.G,ring=self.R))
                 )
 
-def check_space_group(i, compute=True):
-    d=3
-    try:
-        if d in (2,3):
-            G0 = gap.SpaceGroupIT(d,i)
-        else:
-            G0 = gap.SpaceGroup(d,i)
-        G = gap.StandardAffineCrystGroup(G0)
-        #if G != G0:
-        #    print "not isometric", i
-        #    return
-        N = gap.translation_subgroup(G,1)
-        Gq = GapAffineQuotientGroup(G,N, scale=4)
-
-        #assert space_group_preserves_integer_lattice(G,scale=2)
-        n=2
-
-        if compute:
-            print i, trivialized_by_E3_space(cplx,0,0,Gq,
-                    ring=Integers(n))
-            #print i, trivialized_by_E3_but_not_E2(cplx,0,0,Gq,
-            #        get_numpy_encoder_Zn(n=n))
-        else:
-            for k in xrange(len(cplx.cells)):
-                cplx.get_group_action_on_cells(Gq,k)
-
-            print "yes:", i
-    except ComplexNotInvariantError:
-        print "complex not invariant:", i
-    except NotIntegerMatrixError:
-        print "not integer:", i
-
 class GroupCohomologyTests(unittest.TestCase):
     def setUp(self):
         gap.load_package("hap")
@@ -216,7 +184,8 @@ class SpaceGroupTests(unittest.TestCase):
         for i,expected in expected_answers.items():
             G0 = gap.SpaceGroupIT(self.d,i)
             G = gap.StandardAffineCrystGroup(G0)
-            N = chaincplx.gap_space_group_translation_subgroup(G,1)
+            #N = chaincplx.gap_space_group_translation_subgroup(G,1)
+            N = None
             Gq = chaincplx.GapAffineQuotientGroup(G,N, scale=4)
 
             n=2
