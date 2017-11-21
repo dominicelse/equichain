@@ -69,16 +69,10 @@ class TorusTranslationGroupElement(MatrixQuotientGroupElement):
 class GapAffineQuotientGroup(object):
     def _base_init(self):
         self.stored_coset_representatives = dict()
-
-        # Make sure the identity element is always first in the list of elements
-        ident = gap.One(self.pcp_quotient_grp)
-        self.els = [ident] + [g for g in
-                gap.Elements(self.pcp_quotient_grp) if g != ident ]
-
-        print self.els
-        for g in self.els:
+        for g in self.sage_quotient_grp:
             self.stored_coset_representatives[g] = self._coset_representative(g)
 
+        self.els = [g for g in self.sage_quotient_grp]
         self.els_reverse_lookup = dict()
         for i in xrange(len(self.els)):
             self.els_reverse_lookup[self.els[i]] = i
@@ -86,14 +80,15 @@ class GapAffineQuotientGroup(object):
         self.stored_coset_representatives_numpy_int = None
 
     def identity(self):
-        return GapAffineQuotientGroupElement(self, gap.One(self.pcp_quotient_grp))
+        return GapAffineQuotientGroupElement(self, self.sage_quotient_grp.identity())
 
     def __init__(self, G,N, scale=1):
         self.homo_to_factor = gap.NaturalHomomorphismByNormalSubgroup(G,N)
         quotient_group = gap.ImagesSource(self.homo_to_factor)
-        iso_to_pcp = gap.IsomorphismPcpGroup(quotient_group)
-        self.iso_to_pcp_inverse = gap.InverseGeneralMapping(iso_to_pcp)
-        self.pcp_quotient_grp = gap.Image(iso_to_pcp)
+        iso_to_perm = gap.IsomorphismPermGroup(quotient_group)
+        self.iso_to_perm_inverse = gap.InverseGeneralMapping(iso_to_perm)
+        self.gap_quotient_grp = gap.Image(iso_to_perm)
+        self.sage_quotient_grp = PermutationGroup(gap_group = self.gap_quotient_grp)
         self.basegrp = self
         self.scale = scale
 
@@ -104,44 +99,45 @@ class GapAffineQuotientGroup(object):
         #    for j in len(self.els):
 
     def element_from_gap(self, gapg):
-        return GapAffineQuotientGroupElement(self.basegrp, gapg)
+        return GapAffineQuotientGroupElement(self.basegrp,
+                self.basegrp.sage_quotient_grp(gapg))
 
     def subgroup(self, gens):
-        raise NotImplementedError
-        #G = GapAffineQuotientGroup.__new__(GapAffineQuotientGroup)
-        #G.sage_quotient_grp = self.sage_quotient_grp.subgroup([g.sageperm for g in gens])
-        #G.iso_to_perm_inverse = self.iso_to_perm_inverse
-        #G.homo_to_factor = self.homo_to_factor
-        #G.basegrp = self.basegrp
-        #G.scale = self.scale
-        ##G.basegrp = G
-        #G._base_init()
-        #return G
+        G = GapAffineQuotientGroup.__new__(GapAffineQuotientGroup)
+        G.sage_quotient_grp = self.sage_quotient_grp.subgroup([g.sageperm for g in gens])
+        G.iso_to_perm_inverse = self.iso_to_perm_inverse
+        G.homo_to_factor = self.homo_to_factor
+        G.basegrp = self.basegrp
+        G.scale = self.scale
+        #G.basegrp = G
+        G._base_init()
+        return G
 
     def __iter__(self):
         return iter(self.elements())
 
     def gens(self):
-        return [GapAffineQuotientGroupElement(self.basegrp,g) for g in gap.GeneratorsOfGroup(self.pcp_quotient_grp)]
+        return [GapAffineQuotientGroupElement(self.basegrp,g) for g in self.sage_quotient_grp.gens()]
 
     def elements(self):
-        return [GapAffineQuotientGroupElement(self.basegrp, g) for g in self.els]
+        return [GapAffineQuotientGroupElement(self.basegrp, g) for g in self.sage_quotient_grp]
 
     def element_to_index(self, g):
-        return self.els_reverse_lookup[g.gap]
+        return self.els_reverse_lookup[g.sageperm]
 
     def element_by_index(self,i):
         return GapAffineQuotientGroupElement(self.basegrp,self.els[i])
 
     def _coset_representative(self,g):
+        g = gap(g)
         A = matrix(gap.PreImagesRepresentative(
                 self.homo_to_factor,
-                gap.Image(self.iso_to_pcp_inverse, g)).sage())
+                gap.Image(self.iso_to_perm_inverse, g)).sage())
         B = affine_transformation_rescale(A,self.scale)
         return B
 
     def coset_representative(self,g):
-        return self.stored_coset_representatives[g.gap]
+        return self.stored_coset_representatives[g.sageperm]
 
     def _compute_coset_representatives_numpy_int(self):
         self.stored_coset_representatives_numpy_int = dict(
@@ -152,7 +148,7 @@ class GapAffineQuotientGroup(object):
     def coset_representative_numpy_int(self,g):
         if self.stored_coset_representatives_numpy_int is None:
             self._compute_coset_representatives_numpy_int()
-        return self.stored_coset_representatives_numpy_int[g.gap]
+        return self.stored_coset_representatives_numpy_int[g.sageperm]
 
     def __len__(self):
         return self.size()
@@ -214,22 +210,22 @@ class TrivialAffineMatrixGroup(object):
         return 1
 
 class GapAffineQuotientGroupElement(MatrixQuotientGroupElement):
-    def __init__(self, G, gapg):
+    def __init__(self, G, sageperm):
         self.G = G
-        self.gap = gapg
+        self.sageperm = sageperm
 
     def __mul__(a, b):
         assert a.G is b.G
-        return GapAffineQuotientGroupElement(a.G, a.gap*b.gap)
+        return GapAffineQuotientGroupElement(a.G, a.sageperm*b.sageperm)
 
     def __eq__(a,b):
-        return a.gap == b.gap
+        return a.sageperm == b.sageperm
 
     def __ne__(a,b):
         return not a == b
 
     def __pow__(self, n):
-        return GapAffineQuotientGroupElement(self.G, self.gap**(-1))
+        return GapAffineQuotientGroupElement(self.G, self.sageperm**(-1))
 
     def as_matrix_representative(self):
         return self.G.coset_representative(self)
