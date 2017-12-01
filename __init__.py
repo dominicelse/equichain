@@ -20,10 +20,16 @@ from sage.matrix.matrix_mod2_dense import Matrix_mod2_dense
 
 import cython_fns
 
+from sage.modules.vector_rational_dense import Vector_rational_dense
+
 class PointInUniverse(object):
     def __init__(self, universe, coords):
         self.universe = universe
-        self.coords = copy(vector(QQ, universe.canonicalize_coords(coords)))
+        coords = universe.canonicalize_coords(coords)
+        if isinstance(coords, Vector_rational_dense):
+            self.coords = copy(coords)
+        else:
+            self.coords = copy(vector(QQ, coords))
         self.coords.set_immutable()
 
     def __hash__(self):
@@ -57,6 +63,9 @@ class PointInUniverse(object):
         return len(self.coords)
 
     def act_with(self, action):
+        if isinstance(action, PointInUniverseTranslationAction):
+            return action(self)
+
         if isinstance(action, MatrixQuotientGroupElement):
             action = action.as_matrix_representative()
 
@@ -111,27 +120,30 @@ class PointInUniverse(object):
 
 from cython_fns import IntegerPointInUniverse,IntegerPointInUniverseTranslationAction
 
-#class IntegerPointInUniverseTranslationAction(object):
-#    def __init__(self, trans):
-#        self.trans = numpy.array(trans, dtype=int)
-#
-#    def __call__(self, pt):
-#        return IntegerPointInUniverse(pt.universe, pt.coords + self.trans)
-#
-#    def __mul__(x, y):
-#        return IntegerPointInUniverseTranslationAction(x.trans + y.trans)
-#
-#    def __pow__(self,n):
-#        return IntegerPointInUniverseTranslationAction(n*self.trans)
-#
-#    @staticmethod
-#    def get_translation_basis(d, scale=1):
-#        ret = []
-#        for i in xrange(d):
-#            trans = numpy.zeros(d, dtype=int)
-#            trans[i] = scale
-#            ret.append(IntegerPointInUniverseTranslationAction(trans))
-#        return ret
+class PointInUniverseTranslationAction(object):
+    def __init__(self, trans):
+        if isinstance(trans, Vector_rational_dense):
+            self.trans = copy(trans)
+        else:
+            self.trans = vector(QQ, trans)
+
+    def __call__(self, pt):
+        return PointInUniverse(pt.universe, pt.coords + self.trans)
+
+    def __mul__(x, y):
+        return PointInUniverseTranslationAction(x.trans + y.trans)
+
+    def __pow__(self,n):
+        return PointInUniverseTranslationAction(n*self.trans)
+
+    @staticmethod
+    def get_translation_basis(d):
+        ret = []
+        for i in xrange(d):
+            trans = [0]*d
+            trans[i] = 1
+            ret.append(PointInUniverseTranslationAction(trans))
+        return ret
 
 class Universe(object):
     def cell_on_boundary(self, cell):
@@ -594,7 +606,7 @@ def space_group_wigner_seitz_barycentic_subdivision(starting_pt, d, i):
     c = simplicial_cell_complex_from_polymake(B, remember_orientation=False,
             coord_subset=range(1,d+1))
 
-    gens = list(translation_generators_sage(d))
+    gens = PointInUniverseTranslationAction.get_translation_basis(d)
     equiv_relation = EquivalenceRelationFromCommutingActionGenerators(gens,
             c.all_cells_iterator(), reduce_order=1,
             representatives_helper=None)
