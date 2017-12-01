@@ -82,6 +82,9 @@ class FormalIntegerSum(object):
     def __iter__(self):
         return self.coeffs.iteritems()
 
+    def itervectors(self):
+        return self.coeffs.iterkeys()
+
     def act_with(self,action):
         ret = FormalIntegerSum({})
         for o,coeff in self.coeffs.iteritems():

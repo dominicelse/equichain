@@ -209,8 +209,6 @@ class ConvexHullCell(object):
         # projected determinant. Pass None for an unoriented cell.
         self.points = frozenset(points)
         self._orientation = orientation
-        self.original_my_hash = None
-        self.original_my_hash = ConvexHullCell.__hash__(self)
 
     def forget_orientation(self):
         return ConvexHullCell(self.points, None)
@@ -233,10 +231,7 @@ class ConvexHullCell(object):
         return not a == b
 
     def __hash__(self):
-        h = hash(self.points)
-        if self.original_my_hash is not None and h != self.original_my_hash:
-            raise RuntimeError, "ConvexHullCell: hash changed"
-        return h
+        return hash(self.points)
 
     def __iter__(self):
         return iter(self.points)
@@ -249,6 +244,32 @@ class ConvexHullCell(object):
 
     def orientation(self):
         return self._orientation
+
+class SimplexCell(ConvexHullCell):
+    def __init__(self, points, orientation):
+        if orientation is not None:
+            raise NotImplementedError, "Oriented simplices are not implemented yet."
+
+        super(SimplexCell,self).__init__(points,orientation)
+
+    def dimension(self):
+        return len(self.points)-1
+
+    def boundary(self):
+        if self.dimension() == 0:
+            return FormalIntegerSum()
+
+        points_ordered = list(self.points)
+
+        boundary_cells = []
+
+        for i in xrange(len(points_ordered)):
+            onepoint_removed = points_ordered[0:i] + points_ordered[(i+1):]
+            boundary_cells.append(SimplexCell(onepoint_removed, None))
+
+        return FormalIntegerSum(dict(
+            (boundary_cell,1) for boundary_cell in boundary_cells
+            ))
 
 class ConvexHullCellWithMidpoint(ConvexHullCell):
     def __init__(self, points, orientation, midpoint):
@@ -504,6 +525,35 @@ def _cubical_complex_base(ndims, extents, universe, with_midpoints, scale,
 #            [ [0,scale] ]*ndims, FiniteCubicUniverse(extents, []),
 #            with_midpoints=True, scale=scale, pointclass=pointclass)
 
+def sage_polymake_object_from_gap(p):
+    filename = gap.FullFilenameOfPolymakeObject(p)
+    return polymake('load("' + str(filename) + '");')
+
+def simplicial_cell_complex_from_polymake(p, coord_subset, remember_orientation=True):
+    if remember_orientation:
+        raise NotImplementedError
+
+    universe = FlatUniverse()
+
+    def conv_vertex(v):
+        return PointInUniverse(universe, [ sage_eval(str(v[i])) for i in coord_subset ])
+
+    vertices = [ conv_vertex(v) for v in p.COORDINATES ]
+
+    def conv_cell(c):
+        vertices_in_cell = [ vertices[int(i)] for i in c ]
+        return SimplexCell(vertices_in_cell, orientation=None)
+
+    d = int(p.DIM)
+    cplx = CellComplex(d)
+    for facet in p.FACETS:
+        conv_facet = conv_cell(facet)
+        assert conv_facet.dimension() == d
+        cplx.add_cell(d, conv_facet)
+    cplx.complete()
+
+    return cplx
+
 def cubical_complex(ndims, sizes, open_dirs=[], with_midpoints=False, scale=1,
         include_boundary_cells=False,
         pointclass=PointInUniverse):
@@ -535,6 +585,21 @@ def _torus_minimal_barycentric_subdivision_representatives_helper(toroidal_unive
                 return cell.act_with(IntegerPointInUniverseTranslationAction(t))
 
     return cell
+
+def space_group_wigner_seitz_barycentic_subdivision(starting_pt, d, i):
+    G = gap.StandardAffineCrystGroup(gap.SpaceGroupOnRightIT(d,i))
+    P = gap.FundamentalDomainStandardSpaceGroup(gap(starting_pt), G)
+    P = sage_polymake_object_from_gap(P)
+    B = P.barycentric_subdivision()
+    c = simplicial_cell_complex_from_polymake(B, remember_orientation=False,
+            coord_subset=range(1,d+1))
+
+    gens = list(translation_generators_sage(d))
+    equiv_relation = EquivalenceRelationFromCommutingActionGenerators(gens,
+            c.all_cells_iterator(), reduce_order=1,
+            representatives_helper=None)
+
+    return c.quotient(equiv_relation)
 
 def torus_minimal_barycentric_subdivision(ndims):
     scale = 2
@@ -893,6 +958,21 @@ class CellComplex(object):
             self.boundary_data[cell] = cell.boundary()
         else:
             self.boundary_data[cell] = boundary
+
+    # If there are cells that appear in the boundary data (perhaps recursively), 
+    # but not have not themselves been added to self.cells, add them now.
+    # Note that this requires all cells not already known to have boundary() and
+    # dimension() methods.
+    def complete(self):
+        for cell in self.cells[self.ndims]:
+            self._find_all_boundary_cells(cell)
+
+    def _find_all_boundary_cells(self,base):
+        for cell in base.boundary().itervectors():
+            if cell not in self.cells[cell.dimension()]:
+                assert cell.dimension() == base.dimension() - 1 
+                self.cells[cell.dimension()].append(cell)
+                self._find_all_boundary_cells(cell)
 
     def __init__(self,ndims):
         self.ndims = ndims
