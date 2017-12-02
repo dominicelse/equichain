@@ -257,31 +257,6 @@ class ConvexHullCell(object):
     def orientation(self):
         return self._orientation
 
-class SimplexCell(ConvexHullCell):
-    def __init__(self, points, orientation):
-        if orientation is not None:
-            raise NotImplementedError, "Oriented simplices are not implemented yet."
-
-        super(SimplexCell,self).__init__(points,orientation)
-
-    def dimension(self):
-        return len(self.points)-1
-
-    def boundary(self):
-        if self.dimension() == 0:
-            return FormalIntegerSum()
-
-        points_ordered = list(self.points)
-
-        boundary_cells = []
-
-        for i in xrange(len(points_ordered)):
-            onepoint_removed = points_ordered[0:i] + points_ordered[(i+1):]
-            boundary_cells.append(SimplexCell(onepoint_removed, None))
-
-        return FormalIntegerSum(dict(
-            (boundary_cell,1) for boundary_cell in boundary_cells
-            ))
 
 class ConvexHullCellWithMidpoint(ConvexHullCell):
     def __init__(self, points, orientation, midpoint):
@@ -838,6 +813,32 @@ class OrderedSimplex(object):
 
     def __repr__(self):
         return "SIMPLEX" + str(self.vertices)
+
+class SimplexCell(ConvexHullCell):
+    def __init__(self, points, orientation):
+        if orientation is not None:
+            raise NotImplementedError, "Oriented simplices are not implemented yet."
+
+        super(SimplexCell,self).__init__(points,orientation)
+
+    def dimension(self):
+        return len(self.points)-1
+
+    def boundary(self):
+        if self.dimension() == 0:
+            return FormalIntegerSum()
+
+        points_ordered = list(self.points)
+
+        boundary_cells = []
+
+        for i in xrange(len(points_ordered)):
+            onepoint_removed = points_ordered[0:i] + points_ordered[(i+1):]
+            boundary_cells.append(SimplexCell(onepoint_removed, None))
+
+        return FormalIntegerSum(dict(
+            (boundary_cell,1) for boundary_cell in boundary_cells
+            ))
 
 class CellComplex(object):
     #@staticmethod
