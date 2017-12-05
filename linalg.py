@@ -8,7 +8,7 @@ import functools
 try:
     magma('1')
     use_magma = True
-except RuntimeError:
+except TypeError:
     warnings.warn("Could not load Magma. Falling back to Sage for all functionality.")
     use_magma = False
 
