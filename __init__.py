@@ -544,6 +544,7 @@ def cell_complex_from_polytope(p, coord_subset, remember_orientation=True):
                     bi in p.HASSE_DIAGRAM.ADJACENCY.in_adjacent_nodes(i) ))
             else:
                 boundary = FormalIntegerSum()
+            cplx.add_cell(k, cells[int(face)], boundary)
 
     return cplx
 
@@ -611,12 +612,28 @@ def polymaketest(starting_pt, d,i):
     P = sage_polymake_object_from_gap(P)
     return cell_complex_from_polytope(P, remember_orientation=False, coord_subset=range(1,d+1))
 
-def space_group_wigner_seitz_barycentric_subdivision(starting_pt, d, i):
-    starting_pt = gap(starting_pt)
-    G = gap.StandardAffineCrystGroup(gap.SpaceGroupOnRightIT(d,i))
-    P = gap.FundamentalDomainStandardSpaceGroup(starting_pt, G)
-    P = sage_polymake_object_from_gap(P)
-    c = cell_complex_from_polytope(P, remember_orientation=False, coord_subset=range(1,d+1))
+def space_group_wigner_seitz_cell(d, i, starting_pt=None):
+    if starting_pt is None:
+        for denom in xrange(10):
+            for coords in itertools.product(xrange(denom), repeat=d):
+                coords_divided = [ Integer(coord)/denom for coord in coords ]
+                try:
+                    return space_group_wigner_seitz_cell(d,i, coords_divided)
+                except RuntimeError as e:
+                    if e.args[0].args[0].find("Error, center point not in general position") != -1:
+                        continue
+                    else:
+                        raise
+    else:
+        print starting_pt
+        starting_pt = gap(starting_pt)
+        G = gap.StandardAffineCrystGroup(gap.SpaceGroupOnRightIT(d,i))
+        P = gap.FundamentalDomainStandardSpaceGroup(starting_pt, G)
+        P = sage_polymake_object_from_gap(P)
+        return cell_complex_from_polytope(P, remember_orientation=False, coord_subset=range(1,d+1))
+
+def space_group_wigner_seitz_barycentric_subdivision(d, i, starting_pt = None):
+    c = space_group_wigner_seitz_cell(d, i, starting_pt)
 
     c2 = c.barycentric_subdivision()
 
