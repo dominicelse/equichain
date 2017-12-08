@@ -515,6 +515,37 @@ def _cubical_complex_base(ndims, extents, universe, with_midpoints, scale,
 def sage_polymake_object_from_gap(p):
     filename = gap.FullFilenameOfPolymakeObject(p)
     return polymake('load("' + str(filename) + '");')
+    
+def cell_complex_from_polytope(p, coord_subset, remember_orientation=True):
+    if remember_orientation:
+        raise NotImplementedError
+
+    universe = FlatUniverse()
+
+    def conv_vertex(v):
+        return PointInUniverse(universe, [ sage_eval(str(v[i])) for i in coord_subset ])
+
+    vertices = [ conv_vertex(v) for v in p.VERTICES ]
+
+    def conv_cell(c):
+        vertices_in_cell = [ vertices[int(i)] for i in c ]
+        cell = ConvexHullCell(vertices_in_cell, orientation=None)
+        return cell
+
+    cells = [ conv_cell(c) for c in p.HASSE_DIAGRAM.FACES ]
+
+    d = int(p.CONE_DIM)-1
+    cplx = CellComplex(d)
+    for k in xrange(d+1):
+        for face in p.HASSE_DIAGRAM.nodes_of_dim(k):
+            i = int(face)
+            if k > 0:
+                boundary = FormalIntegerSum(dict( (cells[int(bi)],1) for 
+                    bi in p.HASSE_DIAGRAM.ADJACENCY.in_adjacent_nodes(i) ))
+            else:
+                boundary = FormalIntegerSum()
+
+    return cplx
 
 def simplicial_cell_complex_from_polymake(p, coord_subset, remember_orientation=True):
     if remember_orientation:
@@ -573,20 +604,45 @@ def _torus_minimal_barycentric_subdivision_representatives_helper(toroidal_unive
 
     return cell
 
-def space_group_wigner_seitz_barycentic_subdivision(starting_pt, d, i):
+def polymaketest(starting_pt, d,i):
+    starting_pt = gap(starting_pt)
     G = gap.StandardAffineCrystGroup(gap.SpaceGroupOnRightIT(d,i))
-    P = gap.FundamentalDomainStandardSpaceGroup(gap(starting_pt), G)
+    P = gap.FundamentalDomainStandardSpaceGroup(starting_pt, G)
     P = sage_polymake_object_from_gap(P)
-    B = P.barycentric_subdivision()
-    c = simplicial_cell_complex_from_polymake(B, remember_orientation=False,
-            coord_subset=range(1,d+1))
+    return cell_complex_from_polytope(P, remember_orientation=False, coord_subset=range(1,d+1))
 
+def space_group_wigner_seitz_barycentric_subdivision(starting_pt, d, i):
+    starting_pt = gap(starting_pt)
+    G = gap.StandardAffineCrystGroup(gap.SpaceGroupOnRightIT(d,i))
+    P = gap.FundamentalDomainStandardSpaceGroup(starting_pt, G)
+    P = sage_polymake_object_from_gap(P)
+    c = cell_complex_from_polytope(P, remember_orientation=False, coord_subset=range(1,d+1))
+
+    c2 = c.barycentric_subdivision()
+
+    #gens = list(translation_generators_numpy(ndims,scale=scale,with_inverses=True))
     gens = PointInUniverseTranslationAction.get_translation_basis(d)
     equiv_relation = EquivalenceRelationFromCommutingActionGenerators(gens,
-            c.all_cells_iterator(), reduce_order=1,
+            c2.all_cells_iterator(), reduce_order=1,
             representatives_helper=None)
 
-    return c.quotient(equiv_relation)
+    return c2.quotient(equiv_relation)
+
+    #starting_pt = gap(starting_pt)
+    #G = gap.StandardAffineCrystGroup(gap.SpaceGroupOnRightIT(d,i))
+    #P = gap.FundamentalDomainStandardSpaceGroup(starting_pt, G)
+    #P = sage_polymake_object_from_gap(P)
+    #   
+    #B = P.barycentric_subdivision()
+    #c = simplicial_cell_complex_from_polymake(B, remember_orientation=False,
+    #        coord_subset=range(1,d+1))
+    #
+    #gens = PointInUniverseTranslationAction.get_translation_basis(d)
+    #equiv_relation = EquivalenceRelationFromCommutingActionGenerators(gens,
+    #        c.all_cells_iterator(), reduce_order=1,
+    #        representatives_helper=None)
+    #
+    #return c.quotient(equiv_relation)
 
 def torus_minimal_barycentric_subdivision(ndims):
     scale = 2
