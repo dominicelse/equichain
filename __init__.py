@@ -382,7 +382,7 @@ class EquivalenceRelationFromCommutingActionGenerators(object):
         if return_bool:
             return False
         else:
-            raise ValueError, "Cell doesn't appear to have a representative."
+            raise RuntimeError, "Cell doesn't appear to have a representative."
 
     def are_equivalent(self, cell1, cell2):
         return self.canonical_representative(cell1) == self.canonical_representative(cell2)
