@@ -16,6 +16,8 @@ import chaincplx.resolutions as resolutions
 from chaincplx.linalg import *
 from sage.all import *
 
+from chaincplx import wigner_seitz
+
 from sage.matrix.matrix_mod2_dense import Matrix_mod2_dense
 
 import cython_fns
@@ -24,8 +26,11 @@ from sage.modules.vector_rational_dense import Vector_rational_dense
 
 class PointInUniverse(object):
     def __init__(self, universe, coords):
-        self.universe = universe
-        coords = universe.canonicalize_coords(coords)
+        if universe is None:
+            self.universe = FlatUniverse()
+        else:
+            self.universe = universe
+        coords = self.universe.canonicalize_coords(coords)
         if isinstance(coords, Vector_rational_dense):
             self.coords = copy(coords)
         else:
@@ -612,8 +617,9 @@ def polymaketest(starting_pt, d,i):
     P = sage_polymake_object_from_gap(P)
     return cell_complex_from_polytope(P, remember_orientation=False, coord_subset=range(1,d+1))
 
-def space_group_wigner_seitz_cell(d, i, starting_pt=None):
-    raise NotImplementedError
+def space_group_wigner_seitz_cell(d, G):
+    P = wigner_seitz.wigner_seitz_cell(d, G)
+    return cell_complex_from_polytope(P, remember_orientation=False, coord_subset=range(1,d+1))
 
 def space_group_wigner_seitz_barycentric_subdivision(d, i, starting_pt = None):
     c = space_group_wigner_seitz_cell(d, i, starting_pt)
