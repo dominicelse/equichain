@@ -350,28 +350,6 @@ def affine_transformation_from_translation_vector_numpy(v):
     A[0:d,d] = v
     return numpy.asmatrix(A)
 
-def space_group_orthogonality_matrix(d,G):
-    # Some of the space groups in their default setting are not orthogonal with
-    # respect to the usual inner product. This function produces a dxd matrix Q
-    # such that A'*Q*A = Q for all A in the point group.
-
-    gens = [ matrix(gen.sage())[0:d,0:d] for gen in gap.GeneratorsOfGroup(G) ]
-
-    P = identity_matrix(d)
-    if all(gen.transpose() * P * gen == P for gen in gens):
-        return P
-    
-    twothird = Integer(2)/3
-    if d == 2:
-        P = matrix( [ [ 2*twothird, -twothird ], [ -twothird, 2*twothird ] ])
-    elif d == 3:
-        P = matrix( [ [ 2*twothird, -twothird, 0 ], [ -twothird, 2*twothird , 0], [0,0,1] ])
-    if all(gen.transpose() * P * gen == P for gen in gens):
-        return P
-
-
-    raise RuntimeError, "Could not find orthogonality matrix!"
-
 #def toroidal_space_group(d,n,L):
 #    G = gap.SpaceGroupIT(d,n)
 #    trans = gap.translation_subgroup(G,L)
