@@ -621,8 +621,8 @@ def space_group_wigner_seitz_cell(d, G):
     P = wigner_seitz.wigner_seitz_cell(d, G)
     return cell_complex_from_polytope(P, remember_orientation=False, coord_subset=range(1,d+1))
 
-def space_group_wigner_seitz_barycentric_subdivision(d, i, starting_pt = None):
-    c = space_group_wigner_seitz_cell(d, i, starting_pt)
+def space_group_wigner_seitz_barycentric_subdivision(d, i):
+    c = space_group_wigner_seitz_cell(d, i)
 
     c2 = c.barycentric_subdivision()
 
