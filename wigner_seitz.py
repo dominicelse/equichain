@@ -88,7 +88,7 @@ def wigner_seitz_cplx(d, spacegrp):
         if cplx is None:
             cplx = cplx_for_cell
         else:
-            cplx = cplx.merge(cplx_for_cell, check_not_disjoint_dimensions=range(d))
+            cplx = cplx.merge(cplx_for_cell)
 
     return cplx
 
