@@ -102,7 +102,6 @@ def space_group_wigner_seitz_barycentric_subdivision(d, G):
             chaincplx.PointInUniverseTranslationAction(gen.sage()) 
             for gen in gap.TranslationBasis(G)
             ]
-    gens = chaincplx.PointInUniverseTranslationAction.get_translation_basis(d)
     equiv_relation = chaincplx.EquivalenceRelationFromCommutingActionGenerators(gens,
             c2.all_cells_iterator(), reduce_order=1,
             representatives_helper=None)
