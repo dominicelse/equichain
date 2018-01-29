@@ -1139,6 +1139,13 @@ def group_cohomology(G,n, resolution, ring):
 
     return kernel_mod_image(d1,d2)
 
+# TODO: better name for this fucntion
+def akernel(cplx,n,k,G,ring,resolution):
+    delta1 = cplx.get_group_coboundary_matrix(n=n, k=k, G=G, resolution=resolution)
+    delta1 = delta1.change_ring(ring)
+
+    return delta1.right_kernel_matrix()
+
 def trivialized_by_E2_space(cplx,n,k,G,ring,resolution):
     d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G, resolution=resolution)
     delta1 = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G, resolution=resolution)
