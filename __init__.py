@@ -617,38 +617,9 @@ def polymaketest(starting_pt, d,i):
     P = sage_polymake_object_from_gap(P)
     return cell_complex_from_polytope(P, remember_orientation=False, coord_subset=range(1,d+1))
 
-def space_group_wigner_seitz_cell(d, G):
-    P = wigner_seitz.wigner_seitz_cell(d, G)
-    return cell_complex_from_polytope(P, remember_orientation=False, coord_subset=range(1,d+1))
-
-def space_group_wigner_seitz_barycentric_subdivision(d, i):
-    c = space_group_wigner_seitz_cell(d, i)
-
-    c2 = c.barycentric_subdivision()
-
-    #gens = list(translation_generators_numpy(ndims,scale=scale,with_inverses=True))
-    gens = PointInUniverseTranslationAction.get_translation_basis(d)
-    equiv_relation = EquivalenceRelationFromCommutingActionGenerators(gens,
-            c2.all_cells_iterator(), reduce_order=1,
-            representatives_helper=None)
-
-    return c2.quotient(equiv_relation)
-
-    #starting_pt = gap(starting_pt)
-    #G = gap.StandardAffineCrystGroup(gap.SpaceGroupOnRightIT(d,i))
-    #P = gap.FundamentalDomainStandardSpaceGroup(starting_pt, G)
-    #P = sage_polymake_object_from_gap(P)
-    #   
-    #B = P.barycentric_subdivision()
-    #c = simplicial_cell_complex_from_polymake(B, remember_orientation=False,
-    #        coord_subset=range(1,d+1))
-    #
-    #gens = PointInUniverseTranslationAction.get_translation_basis(d)
-    #equiv_relation = EquivalenceRelationFromCommutingActionGenerators(gens,
-    #        c.all_cells_iterator(), reduce_order=1,
-    #        representatives_helper=None)
-    #
-    #return c.quotient(equiv_relation)
+#def space_group_wigner_seitz_cell(d, G):
+#    P = wigner_seitz.wigner_seitz_cell(d, G)
+#    return cell_complex_from_polytope(P, remember_orientation=False, coord_subset=range(1,d+1))
 
 def torus_minimal_barycentric_subdivision(ndims):
     scale = 2
@@ -911,6 +882,30 @@ class CellComplex(object):
     #        j = CellComplex._get_action_on_cell_index(cells,i,action)
     #        A[j,i] = get_relative_orientation(acted_cell.orientation(), cells[j].orientation())
     #    return A
+
+    def merge(cplx1, cplx2, check_not_disjoint_dimensions=()):
+        assert cplx1.ndims == cplx2.ndims
+        ndims = cplx1.ndims
+
+        ret = CellComplex(cplx1.ndims)
+        for k in xrange(ndims+1):
+            cells1 = set(cplx1.cells[k])
+            cells2 = set(cplx2.cells[k])
+
+            common_cells = cells1.intersection(cells2)
+            if k in check_not_disjoint_dimensions and len(common_cells) == 0:
+                raise RuntimeError, "No common cells of dimension " + str(k) + "!"
+
+            for common_cell in cells1.intersection(cells2):
+                if cplx1.boundary_data[common_cell] != cplx2.boundary_data[common_cell]:
+                    raise ValueError, "Can't merge cells -- they don't have the same boundary."
+
+            for cell in cells1.difference(cells2):
+                 ret.add_cell(k, cell, cplx1.boundary_data[cell])
+            for cell in cells2:
+                 ret.add_cell(k, cell, cplx2.boundary_data[cell])
+
+        return ret
 
     def all_cells_iterator(self):
         for cells_k in self.cells:

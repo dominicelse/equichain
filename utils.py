@@ -70,6 +70,12 @@ class FormalIntegerSum(object):
         else:
             self.coeffs = copy.copy(coeffs)
 
+    def __eq__(a,b):
+        return a.coeffs == b.coeffs
+
+    def __ne__(a,b):
+        return not a.__eq__(b)
+
     def __add__(a,b):
         ret = FormalIntegerSum(a.coeffs)
         for o,coeff in b.coeffs.iteritems():
