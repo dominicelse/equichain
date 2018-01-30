@@ -227,6 +227,10 @@ class ConvexHullCell(object):
         self.points = frozenset(points)
         self._orientation = orientation
 
+    def midpoint(self):
+        i = (pt.coords for pt in self.points)
+        return (i.next() + sum(i)) / len(self.points)
+
     def forget_orientation(self):
         return ConvexHullCell(self.points, None)
 
