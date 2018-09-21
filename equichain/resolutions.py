@@ -1,8 +1,8 @@
 from scipy import sparse
-import chaincplx.utils as utils
+import equichain.utils as utils
 import itertools
 import functools
-import chaincplx.linalg as linalg
+import equichain.linalg as linalg
 from sage.all import *
 
 class FreeModuleSyllable(object):

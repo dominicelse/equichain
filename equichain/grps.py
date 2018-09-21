@@ -1,5 +1,5 @@
-from chaincplx.utils import *
-from chaincplx.sageutils import *
+from equichain.utils import *
+from equichain.sageutils import *
 from sage.all import *
 import itertools
 import numpy.matlib

@@ -9,14 +9,14 @@ import sys
 import warnings
 from scipy import sparse
 
-from chaincplx.utils import *
-from chaincplx.grps import *
-from chaincplx.sageutils import *
-import chaincplx.resolutions as resolutions
-from chaincplx.linalg import *
+from equichain.utils import *
+from equichain.grps import *
+from equichain.sageutils import *
+import equichain.resolutions as resolutions
+from equichain.linalg import *
 from sage.all import *
 
-from chaincplx import wigner_seitz
+from equichain import wigner_seitz
 
 from sage.matrix.matrix_mod2_dense import Matrix_mod2_dense
 

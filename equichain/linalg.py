@@ -1,7 +1,7 @@
 from __future__ import division
 from sage.all import *
 import numpy
-from chaincplx import magmaconv
+from equichain import magmaconv
 from scipy import sparse
 import functools
 

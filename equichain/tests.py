@@ -1,8 +1,8 @@
 import unittest
 from sage.all import *
-import chaincplx
-import chaincplx.linalg
-import chaincplx.resolutions
+import equichain
+import equichain.linalg
+import equichain.resolutions
 import numpy
 import itertools
 import cProfile
@@ -15,16 +15,16 @@ def make_twistgrp():
     refl2 = matrix([[1,0,0,0],[0,-1,0,0],[0,0,1,0],[0,0,0,1]])
     G = gap.AffineCrystGroupOnLeft(rot,trans,refl1,refl2)
     N = gap.AffineCrystGroupOnLeft(trans**2)
-    return chaincplx.GapAffineQuotientGroup(G,N)
+    return equichain.GapAffineQuotientGroup(G,N)
 
 class ComplexWithGroupActionGenericTests(object):
     def setUp(self):
         if self.descr == 'twistgrp':
             self.G = make_twistgrp()
-            self.cplx = chaincplx.cubical_complex(3, [1,1,1], [0,1],
+            self.cplx = equichain.cubical_complex(3, [1,1,1], [0,1],
                     with_midpoints=True)
             self.R = Integers(2)
-            #self.resolution = chaincplx.resolutions.HapResolution(
+            #self.resolution = equichain.resolutions.HapResolution(
             #        gap.ResolutionFiniteGroup(Gq.gap_quotient_grp, 3),
             #        Gq)
         else:
@@ -36,13 +36,13 @@ class ComplexWithGroupActionGenericTests(object):
                 D1 = self.cplx.get_group_coboundary_matrix(n=n,k=k,G=self.G,
                         resolution='cython_bar')
                 D2 = self.cplx.get_group_coboundary_matrix(n=n,k=k,G=self.G,
-                        resolution=chaincplx.resolutions.BarResolution(self.G))
+                        resolution=equichain.resolutions.BarResolution(self.G))
                 self.assertEqual(D1.shape, D2.shape)
                 self.assertTrue(D1.equals(D2))
 
     def get_cocycle_soln(self,k,n,cell_index):
         cell = self.cplx.cells[k][cell_index]
-        s = chaincplx.get_nonidentity(chaincplx.get_stabilizer_group(cell,self.G))
+        s = equichain.get_nonidentity(equichain.get_stabilizer_group(cell,self.G))
 
         indexer_in = self.cplx.get_chain_indexer(G=self.G,k=k,n=n)
         
@@ -57,7 +57,7 @@ class ComplexWithGroupActionGenericTests(object):
         for ci in xrange(len(self.cplx.cells[k])):
             xconstr[indexer_in( (0,), ci)] = 0
 
-        soln = chaincplx.solve_matrix_equation_with_constraint(A, subs_indices, xconstr)
+        soln = equichain.solve_matrix_equation_with_constraint(A, subs_indices, xconstr)
 
         return soln
 
@@ -66,7 +66,7 @@ class ComplexWithGroupActionGenericTests(object):
             n = 1
 
             for orbit in self.cplx.get_group_orbits(k,self.G):
-                S = chaincplx.get_stabilizer_group(self.cplx.cells[k][orbit[0]],self.G)
+                S = equichain.get_stabilizer_group(self.cplx.cells[k][orbit[0]],self.G)
                 if S.size() != 2:
                     continue
 
@@ -75,15 +75,15 @@ class ComplexWithGroupActionGenericTests(object):
 
                 for ci in orbit:
                     cell = self.cplx.cells[k][ci]
-                    S = chaincplx.get_stabilizer_group(cell,self.G)
-                    s = chaincplx.get_nonidentity(S)
+                    S = equichain.get_stabilizer_group(cell,self.G)
+                    s = equichain.get_nonidentity(S)
                     self.assertEqual(soln[indexer_in( (0,), ci)], 0)
                     self.assertEqual(soln[indexer_in( (s.toindex(),), ci)], 1)
 
 class ComplexWithGroupActionTestIntegerEquivalence(object):
     def test_integer_equivalence(self):
-        cplx1 = self.make_complex(chaincplx.PointInUniverse)
-        cplx2 = self.make_complex(chaincplx.IntegerPointInUniverse)
+        cplx1 = self.make_complex(equichain.PointInUniverse)
+        cplx2 = self.make_complex(equichain.IntegerPointInUniverse)
 
         for k in xrange(len(cplx1.cells)):
             act1 = cplx1.get_group_action_on_cells(self.G,k,inverse=True)
@@ -103,7 +103,7 @@ class TwistGrpIntegerTests(ComplexWithGroupActionTestIntegerEquivalence,
         self.G = make_twistgrp()
 
     def make_complex(self,pointclass):
-        return chaincplx.cubical_complex(3, [1,1,2], [0,1],
+        return equichain.cubical_complex(3, [1,1,2], [0,1],
                     with_midpoints=False, pointclass=pointclass)
 
 class TwistGrpTests(ComplexWithGroupActionGenericTests, unittest.TestCase):
@@ -132,15 +132,15 @@ class TwistGrpTests(ComplexWithGroupActionGenericTests, unittest.TestCase):
     #    self.assertTrue(numpy.array_equal(u,[0,0]))
 
     def test_E2(self):
-        a = chaincplx.linalg.NumpyVectorOverZn(numpy.array([1,1]), 2)
+        a = equichain.linalg.NumpyVectorOverZn(numpy.array([1,1]), 2)
         self.assertFalse(
-                chaincplx.test_has_solution(lambda:chaincplx.find_E2_trivializer(self.cplx,a,n=0,k=0,G=self.G,ring=self.R))
+                equichain.test_has_solution(lambda:equichain.find_E2_trivializer(self.cplx,a,n=0,k=0,G=self.G,ring=self.R))
                 )
 
     def test_E3(self):
-        a = chaincplx.linalg.NumpyVectorOverZn(numpy.array([1,1]), 2)
+        a = equichain.linalg.NumpyVectorOverZn(numpy.array([1,1]), 2)
         self.assertFalse(
-                chaincplx.test_has_solution(lambda:chaincplx.find_E3_trivializer(self.cplx,a,n=0,k=0,G=self.G,ring=self.R))
+                equichain.test_has_solution(lambda:equichain.find_E3_trivializer(self.cplx,a,n=0,k=0,G=self.G,ring=self.R))
                 )
 
 class GroupCohomologyTests(unittest.TestCase):
@@ -153,11 +153,11 @@ class GroupCohomologyTests(unittest.TestCase):
 
             expected_answer=list(gap.GroupCohomology(gap.PointGroup(G),4))
 
-            Gq = chaincplx.GapAffineQuotientGroup(G,chaincplx.gap_space_group_translation_subgroup(G,1))
-            resolution = chaincplx.resolutions.HapResolution(
+            Gq = equichain.GapAffineQuotientGroup(G,equichain.gap_space_group_translation_subgroup(G,1))
+            resolution = equichain.resolutions.HapResolution(
                     gap.ResolutionFiniteGroup(Gq.gap_quotient_grp, 5),
                     Gq)
-            answer=chaincplx.group_cohomology(Gq, 4,
+            answer=equichain.group_cohomology(Gq, 4,
                     resolution=resolution,
                     ring=ZZ)
 
@@ -166,8 +166,8 @@ class GroupCohomologyTests(unittest.TestCase):
 class SpaceGroupTests(unittest.TestCase):
     def setUp(self):
         self.d = 3
-        self.cplx = chaincplx.cubical_complex(self.d, [1]*self.d, [], with_midpoints=True, scale=2,
-                pointclass=chaincplx.IntegerPointInUniverse)
+        self.cplx = equichain.cubical_complex(self.d, [1]*self.d, [], with_midpoints=True, scale=2,
+                pointclass=equichain.IntegerPointInUniverse)
         gap.load_package("hap")
 
     def test_somethings(self):
@@ -184,24 +184,24 @@ class SpaceGroupTests(unittest.TestCase):
         for i,expected in expected_answers.items():
             G0 = gap.SpaceGroupIT(self.d,i)
             G = gap.StandardAffineCrystGroup(G0)
-            #N = chaincplx.gap_space_group_translation_subgroup(G,1)
+            #N = equichain.gap_space_group_translation_subgroup(G,1)
             N = None
-            Gq = chaincplx.GapAffineQuotientGroup(G,N, scale=4)
+            Gq = equichain.GapAffineQuotientGroup(G,N, scale=4)
 
             n=2
 
-            resolution = chaincplx.resolutions.HapResolution(
+            resolution = equichain.resolutions.HapResolution(
                     gap.ResolutionFiniteGroup(Gq.gap_quotient_grp, 3),
                     Gq)
 
-            space = chaincplx.trivialized_by_E3_space(self.cplx,0,0,Gq,
+            space = equichain.trivialized_by_E3_space(self.cplx,0,0,Gq,
                         ring=Integers(n),
                         resolution=resolution)
 
             #self.assertEqual(len(space), len(expected))
             #self.assertTrue( all(numpy.array_equal(v,w) for v,w in itertools.izip(space, expected)))
 
-            space = chaincplx.trivialized_by_E2_space(self.cplx,0,0,Gq,
+            space = equichain.trivialized_by_E2_space(self.cplx,0,0,Gq,
                     ring=Integers(n),
                         resolution=resolution)
 

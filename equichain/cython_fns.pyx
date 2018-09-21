@@ -1,5 +1,5 @@
 #cython: boundscheck=False,profile=True
-import chaincplx
+import equichain
 import numpy
 from scipy import sparse
 cimport numpy as np
@@ -7,7 +7,7 @@ cimport cython
 import numpy as np
 from cpython.object cimport Py_EQ,Py_NE
 from libc.stdlib cimport calloc,free
-from chaincplx import linalg
+from equichain import linalg
 
 from sage.all import ZZ
 
@@ -105,7 +105,7 @@ cdef class IntegerPointInUniverse:
         return self._coords.to_numpy()
 
     def __init__(self, universe, coords):
-        if isinstance(universe, chaincplx.CubicUniverseWithBoundary):
+        if isinstance(universe, equichain.CubicUniverseWithBoundary):
             universe = None
 
         self.universe = universe
@@ -150,7 +150,7 @@ cdef class IntegerPointInUniverse:
             return IntegerPointInUniverse.from_vector(self.universe,
                     self._coords.add(cast_action.trans))
 
-        if isinstance(action, chaincplx.MatrixQuotientGroupElement):
+        if isinstance(action, equichain.MatrixQuotientGroupElement):
             action = action.as_matrix_representative_numpy_int()
 
         if isinstance(action, numpy.matrix):
@@ -230,7 +230,7 @@ def get_group_coboundary_matrix(cells, int n, G):
     #A = sparse.dok_matrix((indexer_out.total_dim(), indexer_in.total_dim()), dtype=int)
     #A = matrix(base_ring, indexer_out.total_dim(), indexer_in.total_dim(), sparse=True)
 
-    mapped_cell_indices, mapping_parities = chaincplx.get_group_action_on_cells(cells,G,inverse=True)
+    mapped_cell_indices, mapping_parities = equichain.get_group_action_on_cells(cells,G,inverse=True)
 
     cdef np.int_t [:,:] mapped_cell_indices_view = mapped_cell_indices
     cdef np.int_t [:,:] mapping_parities_view = mapping_parities
@@ -317,8 +317,8 @@ def get_group_coboundary_matrix(cells, int n, G):
 
     ## END NATIVE BLOCK
 
-    indexer_out = chaincplx.MultiIndexer(*( (G.size(),) * (n+1) + (len(cells),) ))
-    indexer_in = chaincplx.MultiIndexer(*( (G.size(),) * n + (len(cells),) ))
+    indexer_out = equichain.MultiIndexer(*( (G.size(),) * (n+1) + (len(cells),) ))
+    indexer_in = equichain.MultiIndexer(*( (G.size(),) * n + (len(cells),) ))
 
     A = sparse.coo_matrix((coo_entries,(coo_i,coo_j)), (indexer_out.total_dim(),
         indexer_in.total_dim()), dtype=int)
