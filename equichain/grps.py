@@ -214,6 +214,25 @@ class TrivialAffineMatrixGroup(object):
     def size(self):
         return 1
 
+class TwistedIntegers(object):
+    def __init__(self, G, action_on_Z_fn):
+        self.G = G
+        self.factors = [ action_on_Z_fn(g) for (i,g) in enumerate(G) ]
+
+    @staticmethod
+    def from_orientation_reversing(self, G):
+        def action_on_Z_fn(g):
+            det = gap.Determinant(g.as_matrix_representative())
+            if int(det) not in [1,-1]:
+                raise ValueError, "Determinant was not +/- 1!"
+        return TwistedIntegers(G, action_on_Z_fn)
+
+    def group(self):
+        return self.G
+
+    def action_on_Z(self, g):
+        return self.factors[G.element_to_index(g)]
+
 class GapAffineQuotientGroupElement(MatrixQuotientGroupElement):
     def __init__(self, G, sageperm):
         self.G = G
