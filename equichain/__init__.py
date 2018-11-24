@@ -738,12 +738,11 @@ class ComplexChainIndexer(object):
     def total_dim(self):
         return self.internal_indexer.total_dim()
 
-def get_group_coboundary_matrix(cells, n,G, twist, resolution='cython_bar'):
+def get_group_coboundary_matrix(cells, n,G, resolution='cython_bar'):
     if resolution == 'cython_bar':
         return cython_fns.get_group_coboundary_matrix(cells,n,G)
 
-    mapped_cell_indices, mapping_parities = get_group_action_on_cells(cells,G,
-            anti_unitary_factors=anti_unitary_factors,inverse=True)
+    mapped_cell_indices, mapping_parities = get_group_action_on_cells(cells,G,inverse=True)
 
     if resolution != 'python_bar':
         return resolution.dual_d_matrix(n, len(cells),
@@ -782,7 +781,7 @@ def get_group_coboundary_matrix(cells, n,G, twist, resolution='cython_bar'):
 class ComplexNotInvariantError(Exception):
     pass
 
-def get_action_on_cells(cells,action, twist):
+def get_action_on_cells(cells,action):
     mapped_cell_indices = numpy.empty( len(cells), dtype=int)
     mapping_parities = numpy.empty( len(cells), dtype=int)
 
@@ -795,19 +794,15 @@ def get_action_on_cells(cells,action, twist):
         parity = get_relative_orientation_cells(acted_cell, cells[acted_ci])
 
         mapped_cell_indices[i] = acted_ci
-        mapping_parities[i] = parity*anti_unitary_factor
+        mapping_parities[i] = parity
         
     return mapped_cell_indices, mapping_parities
 
-def get_group_action_on_cells(cells, G, twist, inverse=False):
+def get_group_action_on_cells(cells, G, inverse=False):
     mapped_cell_indices = numpy.empty( (G.size(), len(cells)), dtype=int)
     mapping_parities = numpy.empty( (G.size(), len(cells)), dtype=int)
     
     for (i,g) in enumerate(G):
-        if twist is None:
-            anti_unitary_factor = 1
-        else:
-            anti_unitary_factor = twist.action_on_Z(g)
         mapped_cell_indices_g, mapping_parities_g = get_action_on_cells(cells,
                 g**(-1) if inverse else g)
         mapped_cell_indices[i,:] = mapped_cell_indices_g
@@ -963,8 +958,8 @@ class CellComplex(object):
         acted_cell = cells[i].act_with(action)
         return cells.index(acted_cell)
 
-    def get_group_coboundary_matrix(self, n,G,k, twist=None, resolution='cython_bar'):
-        return get_group_coboundary_matrix(self.cells[k],n,G, twist=twist, resolution=resolution)
+    def get_group_coboundary_matrix(self, n,G,k, resolution='cython_bar'):
+        return get_group_coboundary_matrix(self.cells[k],n,G, resolution=resolution)
 
     #def get_action_matrix(self, k, action):
     #    return CellComplex._get_action_matrix(self.cells[k], action)
@@ -1073,11 +1068,11 @@ def test_has_solution(fn):
             raise
     return True
 
-def trivialized_by_E3_space(cplx,n,k,G,twist,ring, resolution):
+def trivialized_by_E3_space(cplx,n,k,G,ring, resolution):
     d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G, resolution=resolution)
     d2 = cplx.get_boundary_matrix_group_cochain(n=(n+1), k=(k+2), G=G, resolution=resolution)
-    delta1 = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G, twist=twist, resolution=resolution)
-    delta2 = cplx.get_group_coboundary_matrix(n=(n+1), k=(k+2), G=G, twist=twist, resolution=resolution)
+    delta1 = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G, resolution=resolution)
+    delta2 = cplx.get_group_coboundary_matrix(n=(n+1), k=(k+2), G=G, resolution=resolution)
 
     d1,d2,delta1,delta2 = (x.change_ring(ring) for x in (d1,d2,delta1,delta2))
     factory = d1.factory()
@@ -1149,15 +1144,15 @@ def group_cohomology(G,n, resolution, ring):
     return kernel_mod_image(d1,d2)
 
 # TODO: better name for this fucntion
-def akernel(cplx,n,k,G,twist,ring,resolution):
-    delta1 = cplx.get_group_coboundary_matrix(n=n, k=k, G=G, twist=twist, resolution=resolution)
+def akernel(cplx,n,k,G,ring,resolution):
+    delta1 = cplx.get_group_coboundary_matrix(n=n, k=k, G=G, resolution=resolution)
     delta1 = delta1.change_ring(ring)
 
     return delta1.right_kernel_matrix()
 
-def trivialized_by_E2_space(cplx,n,k,G,twist,ring,resolution):
+def trivialized_by_E2_space(cplx,n,k,G,ring,resolution):
     d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G, resolution=resolution)
-    delta1 = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G, twist=twist, resolution=resolution)
+    delta1 = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G, resolution=resolution)
 
     d1,delta1 = (x.change_ring(ring) for x in (d1,delta1))
 
