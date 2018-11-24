@@ -1,14 +1,17 @@
 from distutils.core import setup,Extension
 from Cython.Build import cythonize
+import numpy
 
 ext_modules = [
         Extension('cython_fns',
             sources=['cython_fns.pyx'],
+            include_dirs=[numpy.get_include()]
             ),
         Extension('magmaconv_cython',
             sources=['magmaconv_cython.pyx'],
             language="c++",
-            extra_compile_args=["-std=c++11"]
+            extra_compile_args=["-std=c++11"],
+            include_dirs=[numpy.get_include()]
             )
                 ]
 
