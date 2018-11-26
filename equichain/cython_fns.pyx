@@ -226,11 +226,11 @@ cdef int build_index_in(int n, int ncells, int size_of_group, int ci_in, np.int_
     return index
 
 
-def get_group_coboundary_matrix(cells, int n, G):
+def get_group_coboundary_matrix(cells, int n, G, twist):
     #A = sparse.dok_matrix((indexer_out.total_dim(), indexer_in.total_dim()), dtype=int)
     #A = matrix(base_ring, indexer_out.total_dim(), indexer_in.total_dim(), sparse=True)
 
-    mapped_cell_indices, mapping_parities = equichain.get_group_action_on_cells(cells,G,inverse=True)
+    mapped_cell_indices, mapping_parities = equichain.get_group_action_on_cells(cells,G,twist=twist,inverse=True)
 
     cdef np.int_t [:,:] mapped_cell_indices_view = mapped_cell_indices
     cdef np.int_t [:,:] mapping_parities_view = mapping_parities

@@ -196,6 +196,7 @@ class SpaceGroupTests(unittest.TestCase):
 
             space = equichain.trivialized_by_E3_space(self.cplx,0,0,Gq,
                         ring=Integers(n),
+                        twist=None,
                         resolution=resolution)
 
             #self.assertEqual(len(space), len(expected))
@@ -203,6 +204,7 @@ class SpaceGroupTests(unittest.TestCase):
 
             space = equichain.trivialized_by_E2_space(self.cplx,0,0,Gq,
                     ring=Integers(n),
+                    twist=None,
                         resolution=resolution)
 
             if expected is None:

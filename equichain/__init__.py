@@ -740,10 +740,10 @@ class ComplexChainIndexer(object):
 
 def get_group_coboundary_matrix(cells, n,G, twist, resolution='cython_bar'):
     if resolution == 'cython_bar':
-        return cython_fns.get_group_coboundary_matrix(cells,n,G)
+        return cython_fns.get_group_coboundary_matrix(cells,n,G,twist)
 
     mapped_cell_indices, mapping_parities = get_group_action_on_cells(cells,G,
-            anti_unitary_factors=anti_unitary_factors,inverse=True)
+            twist=twist,inverse=True)
 
     if resolution != 'python_bar':
         return resolution.dual_d_matrix(n, len(cells),
@@ -782,7 +782,7 @@ def get_group_coboundary_matrix(cells, n,G, twist, resolution='cython_bar'):
 class ComplexNotInvariantError(Exception):
     pass
 
-def get_action_on_cells(cells,action, twist):
+def get_action_on_cells(cells,action):
     mapped_cell_indices = numpy.empty( len(cells), dtype=int)
     mapping_parities = numpy.empty( len(cells), dtype=int)
 
@@ -795,7 +795,7 @@ def get_action_on_cells(cells,action, twist):
         parity = get_relative_orientation_cells(acted_cell, cells[acted_ci])
 
         mapped_cell_indices[i] = acted_ci
-        mapping_parities[i] = parity*anti_unitary_factor
+        mapping_parities[i] = parity
         
     return mapped_cell_indices, mapping_parities
 
@@ -811,7 +811,7 @@ def get_group_action_on_cells(cells, G, twist, inverse=False):
         mapped_cell_indices_g, mapping_parities_g = get_action_on_cells(cells,
                 g**(-1) if inverse else g)
         mapped_cell_indices[i,:] = mapped_cell_indices_g
-        mapping_parities[i,:] = mapping_parities_g
+        mapping_parities[i,:] = mapping_parities_g*anti_unitary_factor
 
     return mapped_cell_indices, mapping_parities
 
@@ -1060,8 +1060,8 @@ class CellComplex(object):
         for i in xrange(ndims+1):
             self.cells[i] = IndexedSet()
 
-    def get_group_action_on_cells(self, G, k, inverse=False):
-        return get_group_action_on_cells(self.cells[k], G, inverse)
+    def get_group_action_on_cells(self, G, k, twist=None, inverse=False):
+        return get_group_action_on_cells(self.cells[k], G, twist, inverse)
 
 def test_has_solution(fn):
     try:
@@ -1141,8 +1141,8 @@ def trivialized_by_E3_space(cplx,n,k,G,twist,ring, resolution):
 #        raise ValueError, "Undefined method."
 
 def group_cohomology(G,n, resolution, ring):
-    d1 = get_group_coboundary_matrix([TrivialPermutee()], n, G, resolution)
-    d2 = get_group_coboundary_matrix([TrivialPermutee()], n-1, G, resolution)
+    d1 = get_group_coboundary_matrix([TrivialPermutee()], n, G, twist=None, resolution=resolution)
+    d2 = get_group_coboundary_matrix([TrivialPermutee()], n-1, G, twist=None, resolution=resolution)
 
     d1,d2 = (x.change_ring(ring) for x in (d1, d2))
 
