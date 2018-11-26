@@ -153,6 +153,18 @@ class GroupCohomologyTests(unittest.TestCase):
 
             expected_answer=list(gap.GroupCohomology(gap.PointGroup(G),4))
 
+            gapfn = gap("""function(G) 
+                local R,dets,C,h,ret;
+                R := ResolutionFiniteGroup(G,5);
+                dets := List(GeneratorsOfGroup(G), g -> [ [ Determinant(g) ] ]);
+                h := GroupHomomorphismByImagesNC(G, GL(1,Integers), GeneratorsOfGroup(G), dets);
+                C := HomToIntegralModule(R, h);
+                ret := Cohomology(C,4);
+                return [0];
+            end""")
+
+            expected_answer_twisted = list(gapfn(gap.PointGroup(G)))
+
             Gq = equichain.GapAffineQuotientGroup(G,equichain.gap_space_group_translation_subgroup(G,1))
             resolution = equichain.resolutions.HapResolution(
                     gap.ResolutionFiniteGroup(Gq.gap_quotient_grp, 5),
@@ -160,8 +172,11 @@ class GroupCohomologyTests(unittest.TestCase):
             answer=equichain.group_cohomology(Gq, 4,
                     resolution=resolution,
                     ring=ZZ)
+            answer_twisted = equichain.group_cohomology(Gq, 4, resolutoin=resolution, ring=ZZ,
+                    twist=TwistedIntegers.from_orientation_reversing(G))
 
             self.assertEqual(answer,expected_answer)
+            self.assertEqual(answer_twisted,expected_answer_twisted)
 
 class SpaceGroupTests(unittest.TestCase):
     def setUp(self):
