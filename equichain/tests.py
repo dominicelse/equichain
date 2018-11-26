@@ -154,13 +154,13 @@ class GroupCohomologyTests(unittest.TestCase):
             expected_answer=list(gap.GroupCohomology(gap.PointGroup(G),4))
 
             gapfn = gap("""function(G) 
-                local R,dets,C,h,ret;
-                R := ResolutionFiniteGroup(G,5);
-                dets := List(GeneratorsOfGroup(G), g -> [ [ Determinant(g) ] ]);
-                h := GroupHomomorphismByImagesNC(G, GL(1,Integers), GeneratorsOfGroup(G), dets);
+                local R,dets,C,h,Gp;
+                Gp := Image(IsomorphismPcpGroup(G));
+                R := ResolutionFiniteGroup(Gp,5);
+                dets := List(GeneratorsOfGroup(Gp), g -> [ [ Determinant(PreImageElm(IsomorphismPcpGroup(G), g)) ]]);
+                h := GroupHomomorphismByImagesNC(Gp, GL(1,Integers), GeneratorsOfGroup(Gp), dets);
                 C := HomToIntegralModule(R, h);
-                ret := Cohomology(C,4);
-                return [0];
+                return Cohomology(C,4);
             end""")
 
             expected_answer_twisted = list(gapfn(gap.PointGroup(G)))
@@ -172,8 +172,8 @@ class GroupCohomologyTests(unittest.TestCase):
             answer=equichain.group_cohomology(Gq, 4,
                     resolution=resolution,
                     ring=ZZ)
-            answer_twisted = equichain.group_cohomology(Gq, 4, resolutoin=resolution, ring=ZZ,
-                    twist=TwistedIntegers.from_orientation_reversing(G))
+            answer_twisted = equichain.group_cohomology(Gq, 4, resolution=resolution, ring=ZZ,
+                    twist=equichain.TwistedIntegers.from_orientation_reversing(Gq))
 
             self.assertEqual(answer,expected_answer)
             self.assertEqual(answer_twisted,expected_answer_twisted)
