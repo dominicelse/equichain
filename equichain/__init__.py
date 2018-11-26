@@ -1140,9 +1140,9 @@ def trivialized_by_E3_space(cplx,n,k,G,twist,ring, resolution):
 #    else:
 #        raise ValueError, "Undefined method."
 
-def group_cohomology(G,n, resolution, ring):
-    d1 = get_group_coboundary_matrix([TrivialPermutee()], n, G, twist=None, resolution=resolution)
-    d2 = get_group_coboundary_matrix([TrivialPermutee()], n-1, G, twist=None, resolution=resolution)
+def group_cohomology(G,n, resolution, ring, twist=None):
+    d1 = get_group_coboundary_matrix([TrivialPermutee()], n, G, twist=twist, resolution=resolution)
+    d2 = get_group_coboundary_matrix([TrivialPermutee()], n-1, G, twist=twist, resolution=resolution)
 
     d1,d2 = (x.change_ring(ring) for x in (d1, d2))
 
