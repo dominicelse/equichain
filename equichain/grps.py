@@ -225,13 +225,14 @@ class TwistedIntegers(object):
             det = gap.Determinant(g.as_matrix_representative())
             if int(det) not in [1,-1]:
                 raise ValueError, "Determinant was not +/- 1!"
+            return det
         return TwistedIntegers(G, action_on_Z_fn)
 
     def group(self):
         return self.G
 
     def action_on_Z(self, g):
-        return self.factors[G.element_to_index(g)]
+        return self.factors[self.G.element_to_index(g)]
 
 class GapAffineQuotientGroupElement(MatrixQuotientGroupElement):
     def __init__(self, G, sageperm):
