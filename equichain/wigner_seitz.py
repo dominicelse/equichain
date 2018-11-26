@@ -28,7 +28,9 @@ def inequalities_array_for_closer_to_one_point(x1, x2, Q):
     a = x2*Q*x2 - x1*Q*x1
     v = 2*(x1-x2)*Q
 
-    return [a] + [ vv for vv in v ]
+    ret = [ a ] + [ vv for vv in v ]
+    assert ret != [0,0,0,0]
+    return ret
 
 def voronoi_cell_wrt_neighboring_points(x0, other_pts, Q):
     inequalities = []
@@ -72,8 +74,11 @@ def wigner_seitz_cplx(d, spacegrp):
 
     def iterate_neighbors():
         for k in itertools.product(range(-max_order,max_order+1), repeat=len(gens)):
+            if all(kk == 0 for kk in k):
+                continue
             g = utils.product( (gens[i]**k[i] for i in xrange(1,len(gens))), gens[0]**k[0]  )
             for pt in basepoints:
+                acted = pt.act_with(g)
                 yield pt.act_with(g)
 
     cplx = None
