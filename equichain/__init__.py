@@ -534,23 +534,23 @@ def cell_complex_from_polytope(p, coord_subset, remember_orientation=True):
     def conv_vertex(v):
         return PointInUniverse(universe, [ sage_eval(str(v[i])) for i in coord_subset ])
 
-    vertices = [ conv_vertex(v) for v in p.VERTICES ]
+    vertices = [ conv_vertex(v) for v in p.VERTICES() ]
 
     def conv_cell(c):
         vertices_in_cell = [ vertices[int(i)] for i in c ]
         cell = ConvexHullCell(vertices_in_cell, orientation=None)
         return cell
 
-    cells = [ conv_cell(c) for c in p.HASSE_DIAGRAM.FACES ]
+    cells = [ conv_cell(c) for c in p.HASSE_DIAGRAM().FACES() ]
 
-    d = int(p.CONE_DIM)-1
+    d = int(p.CONE_DIM())-1
     cplx = CellComplex(d)
     for k in xrange(d+1):
-        for face in p.HASSE_DIAGRAM.nodes_of_dim(k):
+        for face in p.HASSE_DIAGRAM().nodes_of_dim(k):
             i = int(face)
             if k > 0:
                 boundary = FormalIntegerSum(dict( (cells[int(bi)],1) for 
-                    bi in p.HASSE_DIAGRAM.ADJACENCY.in_adjacent_nodes(i) ))
+                    bi in p.HASSE_DIAGRAM().ADJACENCY().in_adjacent_nodes(i) ))
             else:
                 boundary = FormalIntegerSum()
             cplx.add_cell(k, cells[int(face)], boundary)
@@ -1073,7 +1073,7 @@ def test_has_solution(fn):
             raise
     return True
 
-def trivialized_by_E3_space(cplx,n,k,G,twist,ring, resolution):
+def trivialized_by_E3(cplx,n,k,G,twist,ring, resolution):
     d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G, resolution=resolution)
     d2 = cplx.get_boundary_matrix_group_cochain(n=(n+1), k=(k+2), G=G, resolution=resolution)
     delta1 = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G, twist=twist, resolution=resolution)
@@ -1088,7 +1088,14 @@ def trivialized_by_E3_space(cplx,n,k,G,twist,ring, resolution):
     B = factory.bmat([[None, delta2],
                      [delta1, -d2]])
 
-    return image_of_constrained_subspace(A,B)
+    img = image_of_constrained_subspace(A,B, False)
+
+    if n > 0:
+        delta0 = cplx.get_group_coboundary_matrix(n=(n-1), k=k, G=G, twist=twist, resolution=resolution)
+
+        img = factory.bmat([img, delta0])
+
+    return coefficients_of_quotient(img)
 
 #def trivialized_by_E3_but_not_E2(cplx,n,k,G,encoder):
 #    triv_by_E3 = trivialized_by_E3_space(cplx,n,k,G,encoder)
@@ -1155,13 +1162,22 @@ def akernel(cplx,n,k,G,twist,ring,resolution):
 
     return delta1.right_kernel_matrix()
 
-def trivialized_by_E2_space(cplx,n,k,G,twist,ring,resolution):
+def E2page(cplx,n,k,G,twist,ring,resolution):
     d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G, resolution=resolution)
     delta1 = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G, twist=twist, resolution=resolution)
 
     d1,delta1 = (x.change_ring(ring) for x in (d1,delta1))
 
-    return image_of_constrained_subspace(d1, delta1)
+    img = image_of_constrained_subspace(d1, delta1, basis=False)
+
+    if n > 0:
+        delta0 = cplx.get_group_coboundary_matrix(n=(n-1), k=k, G=G, twist=twist, resolution=resolution)
+
+        delta0 = delta0.to_numpydense()
+        img = img.to_numpydense()
+        img = img.factory().bmat([img,delta0])
+
+    return coefficients_of_quotient(img)
 
 def find_E2_trivializer(cplx, a, n, k, G, ring):
     d = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G)

@@ -114,6 +114,10 @@ class NumpyMatrixFactoryBase(object):
 
     def bmat(self, block):
         ring = None
+
+        if not isinstance(block[0], list):
+            block = [block]
+
         for i in xrange(len(block)):
             for j in xrange(len(block[i])):
                 if block[i][j] is None:
@@ -149,8 +153,8 @@ class ScipySparseMatrixFactory(NumpyMatrixFactoryBase):
         return self.constructor(sparse.csc_matrix(shape, dtype=self.numpy_dtype))
 
 class NumpyMatrixFactory(NumpyMatrixFactoryBase):
-    def __init__(self, constructor, numpy_dtype):
-        super(ScipySparseMatrixFactory,self).__init__(constructor, numpy_dtype, numpy)
+    def __init__(self, constructor, vector_constructor, numpy_dtype):
+        super(NumpyMatrixFactory,self).__init__(constructor, vector_constructor, numpy_dtype, numpy)
 
 class ScipyOrNumpyMatrixOverRingGeneric(GenericMatrix):
     def __init__(self):
@@ -223,7 +227,7 @@ class NumpyMatrixOverRingGeneric(ScipyOrNumpyMatrixOverRingGeneric):
 
     def factory(self):
         return NumpyMatrixFactory(numpy_dtype=self.A.dtype,
-                constructor=self._constructor)
+                constructor=self._constructor, vector_constructor=self._vector_constructor)
 
     def to_sagedense(self):
         if patched_sage:
@@ -579,12 +583,27 @@ def ScipySparseMatrixOverRing(A, ring):
 #
 #    return [ v for v in intersection.basis() ]
 
-def image_of_constrained_subspace(A,B):
-    """ Finds the basis matrix for the space of vectors v such that there exists
-    x with Bx = 0 such that Ax = v. """
+def coefficients_of_quotient(B):
+    """ Let B be a matrix whose columns are length-n vectors and 
+        span a submodule M of the n-dimensional free module R^n
+        over the base ring R. Then this function returns the torsion coefficients
+        of the quotient R^n/M treated as an additive Abelian group. """
+
+    return B.elementary_divisors()
+
+def image_of_constrained_subspace(A,B, basis=True):
+    """ Finds the image V of ker B under A.
+
+    If basis=True, then returns a matrix whose columns are a basis for V. (not implemented yet)
+    If basis=False, then returns a matrix whose columns span V, but might
+      not be linearly independent.
+    """
 
     if A.shape[1] != B.shape[1]:
         raise ValueError
+
+    if basis:
+        raise NotImplementedError
     #if A.dtype != B.dtype:
     #    raise TypeError
 
@@ -602,6 +621,7 @@ def image_of_constrained_subspace(A,B):
     K = B.right_kernel_matrix()
     AK = A.dot(K)
 
-    return AK.column_space_matrix()
+    return AK
+    #return AK.column_space_matrix()
     #scipy.io.savemat('K.mat', {'B': B, 'K': K, 'C': C})
     #return [C[:,i].flat for i in xrange(C.shape[1])]
