@@ -1073,7 +1073,7 @@ def test_has_solution(fn):
             raise
     return True
 
-def trivialized_by_E3(cplx,n,k,G,twist,ring, resolution):
+def E3page(cplx,n,k,G,twist,ring, resolution):
     d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G, resolution=resolution)
     d2 = cplx.get_boundary_matrix_group_cochain(n=(n+1), k=(k+2), G=G, resolution=resolution)
     delta1 = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G, twist=twist, resolution=resolution)
@@ -1161,6 +1161,17 @@ def akernel(cplx,n,k,G,twist,ring,resolution):
     delta1 = delta1.change_ring(ring)
 
     return delta1.right_kernel_matrix()
+
+def E1page(cplx,n,k,G,twist,ring,resolution):
+    if n == 0:
+        if ring.order() == oo:
+            order = 0
+        else:
+            order = ring.order()
+        return [order]*len(cplx.cells[k])
+    else:
+        delta0 = cplx.get_group_coboundary_matrix(n=(n-1), k=k, G=G, twist=twist, resolution=resolution)
+        return coefficients_of_quotient(delta0)
 
 def E2page(cplx,n,k,G,twist,ring,resolution):
     d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G, resolution=resolution)
