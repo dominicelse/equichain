@@ -29,7 +29,7 @@ def coefficients_of_quotient(A,B):
     # The matrix X encodes these coefficients. A = BX
     X = B.solve_right(A)
 
-    return [n for n in B.elementary_divisors() if n != 1]
+    return [n for n in X.elementary_divisors() if n != 1]
 
 
 def kernel_mod_image(d1,d2):
@@ -62,6 +62,10 @@ class GenericMatrix(object):
     def __repr__(self):
         return repr(self.A)
 
+    @property
+    def backend_obj(self):
+        return self.A
+
     def to_magma(self):
         if self.density == 'dense':
             return self.to_magmadense()
@@ -90,7 +94,8 @@ class GenericMatrix(object):
         return self.to_sagedense().elementary_divisors()
 
     def solve_right(self, v):
-        return v.convert_to_like_self(self.to_sagedense().solve_right(v.to_sagedense()))
+        ret = v.convert_to_like_self(self.to_sagedense().solve_right(v.to_sagedense()))
+        return ret
 
     def __getitem__(self, i):
         if ( (isinstance(i, tuple) and any(isiterable_or_slice(x) for x in i)) or
@@ -337,6 +342,10 @@ class GenericVector(object):
         else:
             return self.v[i]
 
+    @property
+    def backend_obj(self):
+        return self.v
+
     def __setitem__(self, i, x):
         if isinstance(x, GenericVector):
             self.v[i] = x.v
@@ -352,6 +361,7 @@ class GenericVector(object):
 class SageVector(GenericVector):
     def __init__(self, v):
         self.v = v
+        self._constructor = SageVector
 
     def to_sagedense(self):
         return self
@@ -460,7 +470,7 @@ class SageDenseMatrix(GenericMatrix):
         return self.A.base_ring()
 
     def solve_right(self, b):
-        return SageVector(self.A.solve_right(b.v))
+        return b._constructor(self.backend_obj.solve_right(b.backend_obj).change_ring(b.ring))
 
     @property
     def density(self):
@@ -541,7 +551,7 @@ def numpy_dtype_for_ring(ring):
     elif isinstance(ring, IntegerModRing_generic):
         return int
     else:
-        raise NotImplementedError
+        raise NotImplementedError, ring
 
 def NumpyMatrixOverRing(A, ring):
     if ring is ZZ:
@@ -587,14 +597,6 @@ def ScipySparseMatrixOverRing(A, ring):
 #    intersection = column_space.intersection(other_space)
 #
 #    return [ v for v in intersection.basis() ]
-
-def coefficients_of_quotient(A,B):
-    """ Let B be a matrix whose columns are length-n vectors and 
-        span a submodule M of the n-dimensional free module R^n
-        over the base ring R. Then this function returns the torsion coefficients
-        of the quotient R^n/M treated as an additive Abelian group. """
-
-    return [n for n in B.elementary_divisors() if n != 1]
 
 def image_of_constrained_subspace(A,B, basis=True):
     """ Finds the image V of ker B under A.
