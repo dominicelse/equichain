@@ -178,54 +178,54 @@ class GroupCohomologyTests(unittest.TestCase):
             self.assertEqual(answer,expected_answer)
             self.assertEqual(answer_twisted,expected_answer_twisted)
 
-class SpaceGroupTests(unittest.TestCase):
-    def setUp(self):
-        self.d = 3
-        self.cplx = equichain.cubical_complex(self.d, [1]*self.d, [], with_midpoints=True, scale=2,
-                pointclass=equichain.IntegerPointInUniverse)
-        gap.load_package("hap")
-
-    def test_somethings(self):
-        expected_answers = {
-                2: None,
-                10: None,
-                11: None,
-                33: [[1,1,1,1,1,1,1,1]],
-                60: None,
-                77: [[0,0,1,1,1,1,0,0]],
-                81: [[0,0,1,1,1,1,0,0]]
-                }
-
-        for i,expected in expected_answers.items():
-            G0 = gap.SpaceGroupIT(self.d,i)
-            G = gap.StandardAffineCrystGroup(G0)
-            #N = equichain.gap_space_group_translation_subgroup(G,1)
-            N = None
-            Gq = equichain.GapAffineQuotientGroup(G,N, scale=4)
-
-            n=2
-
-            resolution = equichain.resolutions.HapResolution(
-                    gap.ResolutionFiniteGroup(Gq.gap_quotient_grp, 3),
-                    Gq)
-
-            space = equichain.trivialized_by_E3_space(self.cplx,0,0,Gq,
-                        ring=Integers(n),
-                        twist=None,
-                        resolution=resolution)
-
-            #self.assertEqual(len(space), len(expected))
-            #self.assertTrue( all(numpy.array_equal(v,w) for v,w in itertools.izip(space, expected)))
-
-            space = equichain.trivialized_by_E2_space(self.cplx,0,0,Gq,
-                    ring=Integers(n),
-                    twist=None,
-                        resolution=resolution)
-
-            if expected is None:
-                self.assertTrue(space.ncols() == 0)
-            else:
-                self.assertTrue( numpy.array_equal(space.to_numpydense().A.T, expected) )
+#class SpaceGroupTests(unittest.TestCase):
+#    def setUp(self):
+#        self.d = 3
+#        self.cplx = equichain.cubical_complex(self.d, [1]*self.d, [], with_midpoints=True, scale=2,
+#                pointclass=equichain.IntegerPointInUniverse)
+#        gap.load_package("hap")
+#
+#    def test_somethings(self):
+#        expected_answers = {
+#                2: None,
+#                10: None,
+#                11: None,
+#                33: [[1,1,1,1,1,1,1,1]],
+#                60: None,
+#                77: [[0,0,1,1,1,1,0,0]],
+#                81: [[0,0,1,1,1,1,0,0]]
+#                }
+#
+#        for i,expected in expected_answers.items():
+#            G0 = gap.SpaceGroupIT(self.d,i)
+#            G = gap.StandardAffineCrystGroup(G0)
+#            #N = equichain.gap_space_group_translation_subgroup(G,1)
+#            N = None
+#            Gq = equichain.GapAffineQuotientGroup(G,N, scale=4)
+#
+#            n=2
+#
+#            resolution = equichain.resolutions.HapResolution(
+#                    gap.ResolutionFiniteGroup(Gq.gap_quotient_grp, 3),
+#                    Gq)
+#
+#            space = equichain.trivialized_by_E3_space(self.cplx,0,0,Gq,
+#                        ring=Integers(n),
+#                        twist=None,
+#                        resolution=resolution)
+#
+#            #self.assertEqual(len(space), len(expected))
+#            #self.assertTrue( all(numpy.array_equal(v,w) for v,w in itertools.izip(space, expected)))
+#
+#            space = equichain.trivialized_by_E2_space(self.cplx,0,0,Gq,
+#                    ring=Integers(n),
+#                    twist=None,
+#                        resolution=resolution)
+#
+#            if expected is None:
+#                self.assertTrue(space.ncols() == 0)
+#            else:
+#                self.assertTrue( numpy.array_equal(space.to_numpydense().A.T, expected) )
 
 
 if __name__ == '__main__':
