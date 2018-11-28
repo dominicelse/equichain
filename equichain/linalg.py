@@ -20,20 +20,25 @@ else:
     patched_sage = False
     print "WARNING: patched Sage not found; performance will be much slower"
 
+def coefficients_of_quotient(A,B):
+    """ Let V and W be the column spaces of A and B respectively, and assume that V <= W.
+    We require that the columns of B be linearly independent (not necessary for A).
+    This function returns the torsion coefficients of V/W. """
+
+    # Given the assumptions, the columns of A can be expressed as linear combinations of the columns of B.
+    # The matrix X encodes these coefficients. A = BX
+    X = B.solve_right(A)
+
+    return [n for n in B.elementary_divisors() if n != 1]
+
+
 def kernel_mod_image(d1,d2):
     # Returns the torsion coefficients of (ker d1)/(im d2), where d1 d2 = 0
 
-    #image = column_space_matrix(d2,encoder)
     kernel = d1.right_kernel_matrix()
 
-    assert d1.dot(d2).count_nonzero() == 0
+    return coefficients_of_quotient(d2,kernel)
 
-    AB = d2.factory().bmat([[kernel,-d2]])
-    k2 = AB.right_kernel_matrix()
-    alpha = k2[0:kernel.shape[1],:]
-    divisors = alpha.elementary_divisors()
-
-    return [ divisor for divisor in divisors if divisor != 1 ]
 
 def isiterable_or_slice(i):
     try:
@@ -583,13 +588,13 @@ def ScipySparseMatrixOverRing(A, ring):
 #
 #    return [ v for v in intersection.basis() ]
 
-def coefficients_of_quotient(B):
+def coefficients_of_quotient(A,B):
     """ Let B be a matrix whose columns are length-n vectors and 
         span a submodule M of the n-dimensional free module R^n
         over the base ring R. Then this function returns the torsion coefficients
         of the quotient R^n/M treated as an additive Abelian group. """
 
-    return B.elementary_divisors()
+    return [n for n in B.elementary_divisors() if n != 1]
 
 def image_of_constrained_subspace(A,B, basis=True):
     """ Finds the image V of ker B under A.
