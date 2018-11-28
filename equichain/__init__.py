@@ -1073,6 +1073,20 @@ def test_has_solution(fn):
             raise
     return True
 
+def Enpage_helper(img,  cplx,n,k,G,twist,ring,resolution):
+    if n > 0:
+        delta0_in = cplx.get_group_coboundary_matrix(n=(n-1), k=k, G=G, twist=twist, resolution=resolution)
+
+        delta0_in = delta0_in.to_numpydense()
+        img = img.to_numpydense()
+        img = img.factory().bmat([img,delta0_in])
+
+        delta0_out = cplx.get_group_coboundary_matrix(n=n, k=k, G=G, twist=twist, resolution=resolution)
+
+        return kernel_mod_image(delta0_out, img)
+    else:
+        return coefficients_of_quotient(img)
+
 def E3page(cplx,n,k,G,twist,ring, resolution):
     d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G, resolution=resolution)
     d2 = cplx.get_boundary_matrix_group_cochain(n=(n+1), k=(k+2), G=G, resolution=resolution)
@@ -1090,12 +1104,7 @@ def E3page(cplx,n,k,G,twist,ring, resolution):
 
     img = image_of_constrained_subspace(A,B, False)
 
-    if n > 0:
-        delta0 = cplx.get_group_coboundary_matrix(n=(n-1), k=k, G=G, twist=twist, resolution=resolution)
-
-        img = factory.bmat([img, delta0])
-
-    return coefficients_of_quotient(img)
+    return Enpage_helper(img, cplx,n,k,G,twist,ring,resolution)
 
 #def trivialized_by_E3_but_not_E2(cplx,n,k,G,encoder):
 #    triv_by_E3 = trivialized_by_E3_space(cplx,n,k,G,encoder)
@@ -1170,8 +1179,9 @@ def E1page(cplx,n,k,G,twist,ring,resolution):
             order = ring.order()
         return [order]*len(cplx.cells[k])
     else:
-        delta0 = cplx.get_group_coboundary_matrix(n=(n-1), k=k, G=G, twist=twist, resolution=resolution)
-        return coefficients_of_quotient(delta0)
+        delta0_in = cplx.get_group_coboundary_matrix(n=(n-1), k=k, G=G, twist=twist, resolution=resolution)
+        delta0_out = cplx.get_group_coboundary_matrix(n=n, k=k, G=G, twist=twist, resolution=resolution)
+        return kernel_mod_image(delta0_out, delta0_in)
 
 def E2page(cplx,n,k,G,twist,ring,resolution):
     d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G, resolution=resolution)
@@ -1181,14 +1191,7 @@ def E2page(cplx,n,k,G,twist,ring,resolution):
 
     img = image_of_constrained_subspace(d1, delta1, basis=False)
 
-    if n > 0:
-        delta0 = cplx.get_group_coboundary_matrix(n=(n-1), k=k, G=G, twist=twist, resolution=resolution)
-
-        delta0 = delta0.to_numpydense()
-        img = img.to_numpydense()
-        img = img.factory().bmat([img,delta0])
-
-    return coefficients_of_quotient(img)
+    return Enpage_helper(img, cplx,n,k,G,twist,ring,resolution)
 
 def find_E2_trivializer(cplx, a, n, k, G, ring):
     d = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G)

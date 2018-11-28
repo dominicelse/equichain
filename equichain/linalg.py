@@ -20,14 +20,20 @@ else:
     patched_sage = False
     print "WARNING: patched Sage not found; performance will be much slower"
 
-def coefficients_of_quotient(A,B):
+def coefficients_of_quotient(A,B=None):
     """ Let V and W be the column spaces of A and B respectively, and assume that V <= W.
     We require that the columns of B be linearly independent (not necessary for A).
-    This function returns the torsion coefficients of V/W. """
+    This function returns the torsion coefficients of V/W. 
 
-    # Given the assumptions, the columns of A can be expressed as linear combinations of the columns of B.
-    # The matrix X encodes these coefficients. A = BX
-    X = B.solve_right(A)
+    If B is None, then W is the free module of dimension A.nrows().
+    """
+
+    if B is not None:
+        # Given the assumptions, the columns of A can be expressed as linear combinations of the columns of B.
+        # The matrix X encodes these coefficients. A = BX
+        X = B.solve_right(A)
+    else:
+        X = A
 
     return [n for n in X.elementary_divisors() if n != 1]
 
