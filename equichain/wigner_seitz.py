@@ -8,8 +8,20 @@ from sage.all import *
 def argmax(l, f):
     return max(l, key=f)
 
-def good_atom_locations(d,G):
-    # Finds a good set of "atom locations" within a unit cell
+def good_atom_locations(d,G, L=None):
+    # Finds a good set of "atom locations" within a unit cell 
+    #   (or L[0] x L[1] x ... x L[d-1] unit cells)
+
+    if L is not None:
+        locs = good_atom_locations(d,G,None)
+
+        translated_locs = []
+        
+        for i in itertools.product(*(xrange(l) for l in L)):
+            trans = equichain.PointInUniverseTranslationAction(i)
+            translated_locs += [ pt.act_with(trans) for pt in locs ]
+
+        return translated_locs
 
     wyckoff_positions = gap.WyckoffPositions(G)
 
@@ -61,8 +73,8 @@ def space_group_orthogonality_matrix(d,G):
 
     raise RuntimeError, "Could not find orthogonality matrix!"
 
-def wigner_seitz_cplx(d, spacegrp):
-    basepoints = set(good_atom_locations(d, spacegrp))
+def wigner_seitz_cplx(d, spacegrp, L=None):
+    basepoints = set(good_atom_locations(d, spacegrp,L))
     Q = space_group_orthogonality_matrix(d, spacegrp)
 
     gens = [ 
@@ -97,14 +109,14 @@ def wigner_seitz_cplx(d, spacegrp):
 
     return cplx
 
-def space_group_wigner_seitz_barycentric_subdivision(d, G):
-    c = wigner_seitz_cplx(d, G)
+def space_group_wigner_seitz_barycentric_subdivision(d, G, L=1):
+    c = wigner_seitz_cplx(d, G, [L]*d)
 
     c2 = c.barycentric_subdivision()
 
     #gens = list(translation_generators_numpy(ndims,scale=scale,with_inverses=True))
     gens = [ 
-            equichain.PointInUniverseTranslationAction(gen.sage()) 
+            equichain.PointInUniverseTranslationAction(L*gen.sage()) 
             for gen in gap.TranslationBasis(G)
             ]
     equiv_relation = equichain.EquivalenceRelationFromCommutingActionGenerators(gens,
