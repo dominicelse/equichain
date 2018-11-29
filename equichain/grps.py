@@ -3,6 +3,7 @@ from equichain.sageutils import *
 from sage.all import *
 import itertools
 import numpy.matlib
+import string
 gap.load_package("Cryst")
 gap.SetCrystGroupDefaultAction(gap.LeftAction)
 
@@ -30,41 +31,115 @@ class TorusTranslationGroup(object):
 class MatrixQuotientGroupElement(object):
     pass
 
-class TorusTranslationGroupElement(MatrixQuotientGroupElement):
-    def __init__(self, G, i):
-        assert len(i) == len(G.dims)
+class MagneticTorusTranslationGroupElement(MatrixQuotientGroupElement):
+    def __init__(self, G, gaprepr):
         self.G = G
-        self.i = numpy.array(i, dtype=int) % G.dims
-        self.i.setflags(write=False)
+        self.gaprepr = gaprepr
 
-    def __mul__(a,b):
+    def __prod__(a, b):
         assert a.G is b.G
-        return TorusTranslationGroupElement(a.G, a.i + b.i)
+        return MagneticTorusTranslationGroupElement(a.G, a.gaprepr*b.gaprepr)
 
-    def __inv__(self):
-        return TorusTranslationGroupElement(self.G, -self.i)
+    def __pow__(a, n):
+        return MagneticTorusTranslationGroupElement(a.G, a.gaprepr**n)
 
-    def __eq__(a,b):
-        assert a.G is b.G
-        return all(a.i == b.i)
+    def __eq__(a):
+        raise NotImplementedError
 
-    def __ne__(a,b):
-        return not a == b
+    def __ne__(a):
+        raise NotImplementedError
 
-    def __hash__(self):
-        return hash(self.i.data)
+    def to_translation_vector(self):
+        s = str(self.gaprepr)
+        components = s.split('*')
+        t = vector(ZZ,2)
+        for comp in components:
+            if '^' in comp:
+                splitted = comp.split('^')
+                genname = splitted[0]
+                power = eval(splitted[1])
+            else:
+                genname = comp
+                power = 1
+
+            if genname == 'Tx':
+                cur_t += vector([0,1])
+            elif genname == 'Ty':
+                cur_t += vector([1,0])
+            else:
+                continue
+
+            t += cur_t*power
+        return t
+
+    def as_matrix_representative(self):
+        return affine_translation_from_translation_vector_sage(self.to_translation_vector)
+
+    def as_matrix_representative_numpy_int(self):
+        raise NotImplementedError
 
     def toindex(self):
         return self.G.element_to_index(self)
 
-    def __pow__(self,n):
-        return TorusTranslationGroupElement(self.G, -self.i)
+class MagneticTorusTranslationGroup(object):
+    def element_to_index(self, e):
+        raise NotImplementedError
 
-    def as_matrix_representative(self):
-        ndims = len(self.G.dims)
-        A = numpy.eye(ndims + 1, dtype=int)
-        A[0:(ndims+1),-1] = self.i
-        return matrix(A)
+    def element_by_index(self, i):
+        return self.elts[i]
+
+    def size(self):
+        return len(self.elts)
+
+    def identity(self):
+        return self.elts[0]**0
+
+    def gens(self):
+        return self._gens
+
+    def __len__(self):
+        return self.size()
+
+    def __init__(self, Lx, Ly, A_torsion_coeffs, fluxcoeffs):
+        self.Lx = Lx
+        self.Ly = Ly
+        self.A_torsion_coeffs = A_torsion_coeffs
+        self.fluxcoeffs = fluxcoeffs
+
+        An = len(A_torsion_coeffs)
+        assert An <= 26
+        assert len(fluxcoeffs) == An
+
+        for L in Lx,Ly:
+            assert all(fluxcoeffs[i]*L % A_torsion_coeffs[i] == 0 for i in xrange(An))
+
+        A_gennames = string.ascii_lowercase[0:An]
+
+        gapcmd = ('FreeGroup("Tx","Ty"' +
+                ''.join(',"' + genname + '"' for genname in A_gennames)
+                  + ')')
+        F = gap(gapcmd)
+
+        gens = gap.GeneratorsOfGroup(F)
+        Tx = gens[1]
+        Ty = gens[2]
+        Agens = [ gens[i+3] for i in xrange(An) ]
+
+        flux = Agens[0]**fluxcoeffs[0]
+        for i in xrange(1,An):
+            flux *= Agens[i]**fluxcoeffs[i]
+
+        relations = [ Tx*Ty*Tx**(-1)*Ty**(-1)*flux**(-1) ]
+        for i in xrange(An):
+            relations.append(Agens[i] ** A_torsion_coeffs[i])
+            relations.append(Tx*Agens[i]*Tx**(-1)*Agens[i])
+        relations.append(Tx**Lx)
+        relations.append(Ty**Ly)
+
+        relations = gap(relations)
+        self.gapgrp = gap(F.name() + ' / ' + relations.name())
+        self.elts = list(MagneticTorusTranslationGroupElement(self, g) for g in gap.List(self.gapgrp))
+        self._gens = list(MagneticTorusTranslationGroupElement(self,g) for g in gap.GeneratorsOfGroup(self.gapgrp))
 
 class GapAffineQuotientGroup(object):
     def _base_init(self):
@@ -356,13 +431,13 @@ def translation_generators_numpy(d, scale=1, with_inverses=False):
             A[i,d] = -scale
             yield A
 
-#def affine_transformation_from_translation_vector_sage(v):
-#    d = len(v)
-#    A = matrix(ZZ, n+1, n+1)
-#    for i in xrange(d):
-#        A[i,i] = 1
-#    A[0:d,d] = v
-#    return A
+def affine_transformation_from_translation_vector_sage(v):
+    d = len(v)
+    A = matrix(ZZ, n+1, n+1)
+    for i in xrange(d):
+        A[i,i] = 1
+    A[0:d,d] = v
+    return A
 
 def affine_transformation_from_translation_vector_numpy(v):
     d = len(v)
