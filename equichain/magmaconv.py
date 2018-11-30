@@ -52,7 +52,6 @@ def magma_sparse_matrix_from_scipy(A, ring):
             magmadata.append(val)
 
     s = str(magmadata.data)
-    print magma(s)
     return magma.SparseMatrix(ring, A.shape[0], A.shape[1], magma(s))
 
 def magma_dense_matrix_from_numpy(A, ring):
@@ -60,7 +59,7 @@ def magma_dense_matrix_from_numpy(A, ring):
     return magmaconv_cython.numpy_int_matrix_to_magma(A,ring)
 
 def scipy_sparse_matrix_from_magma(A, sparse_matrix_class=sparse.coo_matrix):
-    magmadata = [ tuple(x) for x in magma.ElementToSequence(A) ]
+    magmadata = eval(str(magma.ElementToSequence(A)).replace('<','(').replace('>',')'))
 
     data = numpy.empty( len(magmadata), dtype=int)
     i = numpy.empty( len(magmadata), dtype=int)
