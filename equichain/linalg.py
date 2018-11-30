@@ -267,9 +267,6 @@ class NumpyMatrixOverRingGeneric(ScipyOrNumpyMatrixOverRingGeneric):
     def convert_to_like_self(self,a):
         return a.to_numpydense()
 
-    def count_nonzero(self):
-        return numpy.count_nonzero
-
     def equals(self, b):
         return numpy.array_equal(self.A, self.b.A)
 
@@ -512,8 +509,17 @@ class MagmaMatrix(GenericMatrix):
         # Note that Magma uses the opposite ordering, hence all the transposes
         ret = MagmaDenseMatrix( 
                 magma.Transpose(magma.KernelMatrix(magma.Transpose(self.A))), self.ring)
-        return ret
 
+        # Although Magma always returns a dense matrix, empirically the number of nonzero entries is
+        # often quite low. So it can be more efficient to convert back to a sparse matrix.
+        if self.density == 'sparse' and ret.count_nonzero() < 0.1 * ret.nrows() * ret.ncols():
+            print "Converting Magma output to sparse..."
+            return ret.to_magmasparse()
+        else:
+            return ret
+
+    def count_nonzero(self):
+        return magma.NumberOfNonZeroEntries(self.A)
 class MagmaDenseMatrix(MagmaMatrix):
     def __init__(self,A,ring):
         self.A = A
@@ -533,6 +539,9 @@ class MagmaDenseMatrix(MagmaMatrix):
     def to_sagedense(self):
         return self.to_numpydense().to_sagedense()
 
+    def to_magmasparse(self):
+        return MagmaSparseMatrix(magma.SparseMatrix(self.A), self.ring)
+
     def convert_to_like_self(self,obj):
         return obj.to_magmadense()
 
@@ -550,6 +559,9 @@ class MagmaSparseMatrix(MagmaMatrix):
         return ScipySparseMatrixOverRing(
                 magmaconv.scipy_sparse_matrix_from_magma(self.A),
                 self.ring)
+
+    def to_magmadense(self):
+        return MagmaDenseMatrix(magma.Matrix(self.A), self.ring)
 
     @property
     def density(self):
