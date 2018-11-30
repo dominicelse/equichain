@@ -512,7 +512,6 @@ class MagmaMatrix(GenericMatrix):
         # Note that Magma uses the opposite ordering, hence all the transposes
         ret = MagmaDenseMatrix( 
                 magma.Transpose(magma.KernelMatrix(magma.Transpose(self.A))), self.ring)
-        #print "Finished magma right_kernel_matrix_"
         return ret
 
 class MagmaDenseMatrix(MagmaMatrix):
@@ -520,6 +519,12 @@ class MagmaDenseMatrix(MagmaMatrix):
         self.A = A
         self.ring = ring
         self._constructor = functools.partial(MagmaDenseMatrix, ring=ring)
+
+    def nrows(self):
+        return magma.Nrows(self.A)
+
+    def ncols(self):
+        return magma.Ncols(self.A)
 
     def to_numpydense(self):
         return NumpyMatrixOverRing(magmaconv.numpy_dense_matrix_from_magma(self.A),
