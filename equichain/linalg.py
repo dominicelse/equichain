@@ -53,11 +53,6 @@ def isiterable_or_slice(i):
     except TypeError:
         return isinstance(i,slice)
 
-if use_magma:
-    right_kernel_use = 'magma'
-else:
-    right_kernel_use = 'sage'
-
 class GenericMatrix(object):
     def __init__(self):
         raise NotImplementedError
@@ -79,13 +74,11 @@ class GenericMatrix(object):
             return self.to_magmasparse()
 
     def right_kernel_matrix(self):
-        if right_kernel_use == 'sage':
-            conv = self.to_sagedense()
-        elif right_kernel_use == 'magma':
-            conv = self.to_magma()
+        if self.density == 'sparse' and use_magma:
+            conv = self.to_magmasparse()
         else:
-            raise NotImplementedError
-        return self.convert_to_like_self_preserve_density(conv.right_kernel_matrix_())
+            conv = self.to_sagedense()
+        return conv.right_kernel_matrix()
 
     def pivots(self):
         return self.to_sagedense().pivots()
@@ -205,6 +198,8 @@ class ScipySparseMatrixOverRingGeneric(ScipyOrNumpyMatrixOverRingGeneric):
             return self._constructor(self.A.dot(b.A))
         elif isinstance(b, NumpyMatrixOverRingGeneric):
             return self.to_numpydense().dot(b)
+        elif isinstance(b, MagmaMatrix):
+            return self.to_magma().dot(b)
         else:
             raise NotImplementedError
 
@@ -218,6 +213,9 @@ class ScipySparseMatrixOverRingGeneric(ScipyOrNumpyMatrixOverRingGeneric):
         return MagmaSparseMatrix(magmaconv.magma_sparse_matrix_from_scipy(self.A,
             self.ring),
             self.ring)
+
+    def to_magmadense(self):
+        return self.to_magmasparse().to_magmadense()
 
     def convert_to_like_self(self,a):
         return a.to_scipysparse()
@@ -479,9 +477,7 @@ class SageDenseMatrix(GenericMatrix):
     def density(self):
         return "dense"
 
-    def right_kernel_matrix_(self):
-        #print "right_kernel_matrix:", (self.A.nrows(), self.A.ncols())
-        
+    def right_kernel_matrix(self):
         # Flint is a lot faster than the default algorithm when working over the
         # integers.
         if self.ring is ZZ:
@@ -491,7 +487,6 @@ class SageDenseMatrix(GenericMatrix):
 
         ret = SageDenseMatrix(self.A.right_kernel_matrix(basis='computed', **kwargs).transpose())
 
-        #print "right_kernel_matrix: done"
         return ret
 
     def pivots(self):
@@ -504,7 +499,7 @@ class MagmaMatrix(GenericMatrix):
     def __init__(self):
         raise NotImplementedError
 
-    def right_kernel_matrix_(self):
+    def right_kernel_matrix(self):
         #print "Calling magma right_kernel_matrix_:", self.density
         # Note that Magma uses the opposite ordering, hence all the transposes
         ret = MagmaDenseMatrix( 
@@ -518,8 +513,21 @@ class MagmaMatrix(GenericMatrix):
         else:
             return ret
 
+    def solve_right(a,b):
+        return a.to_magmadense().solve_right(b)
+
+    def dot(a,b):
+        if not isinstance(b,MagmaMatrix):
+            raise NotImplementedError
+
+        return a._constructor(a.A*b.A)
+
     def count_nonzero(self):
         return magma.NumberOfNonZeroEntries(self.A)
+
+    def elementary_divisors(self):
+        return self.to_magmadense().elementary_divisors()
+
 class MagmaDenseMatrix(MagmaMatrix):
     def __init__(self,A,ring):
         self.A = A
@@ -544,6 +552,17 @@ class MagmaDenseMatrix(MagmaMatrix):
 
     def convert_to_like_self(self,obj):
         return obj.to_magmadense()
+
+    def solve_right(self,b):
+        if not isinstance(b,MagmaDenseMatrix):
+            b = b.to_magmadense()
+
+        return self._constructor(
+                magma.Transpose(magma.Solution(magma.Transpose(self.A), magma.Transpose(b.A)))
+                )
+
+    def elementary_divisors(self):
+        return magma.ElementaryDivisors(self.A)
 
     @property
     def density(self):
