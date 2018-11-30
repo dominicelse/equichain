@@ -52,6 +52,7 @@ def magma_sparse_matrix_from_scipy(A, ring):
             magmadata.append(val)
 
     s = str(magmadata.data)
+    print magma(s)
     return magma.SparseMatrix(ring, A.shape[0], A.shape[1], magma(s))
 
 def magma_dense_matrix_from_numpy(A, ring):
@@ -69,7 +70,7 @@ def scipy_sparse_matrix_from_magma(A, sparse_matrix_class=sparse.coo_matrix):
         j[k] = tup[1]-1
         data[k] = tup[2]
 
-    Acoo = sparse.coo_matrix((data, (i,j)), (magma.Nrows(A), magma.Ncols(A)))
+    Acoo = sparse.coo_matrix((data, (i,j)), (int(magma.Nrows(A)), int(magma.Ncols(A))))
 
     if sparse_matrix_class is sparse.coo_matrix:
         A = Acoo
