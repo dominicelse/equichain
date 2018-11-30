@@ -35,6 +35,7 @@ class MagneticTorusTranslationGroupElement(MatrixQuotientGroupElement):
     def __init__(self, G, gaprepr):
         self.G = G
         self.gaprepr = gaprepr
+        self._matrix_representative = None
 
     def __prod__(a, b):
         assert a.G is b.G
@@ -43,14 +44,19 @@ class MagneticTorusTranslationGroupElement(MatrixQuotientGroupElement):
     def __pow__(a, n):
         return MagneticTorusTranslationGroupElement(a.G, a.gaprepr**n)
 
-    def __eq__(a):
-        raise NotImplementedError
+    def __eq__(a,b):
+        assert a.G is b.G
+        return a.gaprepr == b.gaprepr
 
-    def __ne__(a):
-        raise NotImplementedError
+    def __ne__(a, b):
+        return not (a == b)
 
     def to_translation_vector(self):
-        s = str(self.gaprepr)
+        transgap = gap.Image(self.G.homo_to_gap_transgrp, self.gaprepr)
+        if transgap == gap.Identity(self.G.gap_transgrp):
+            return vector([0,0])
+
+        s = str(transgap)
         components = s.split('*')
         t = vector(ZZ,2)
         for comp in components:
@@ -62,18 +68,22 @@ class MagneticTorusTranslationGroupElement(MatrixQuotientGroupElement):
                 genname = comp
                 power = 1
 
-            if genname == 'Tx':
-                cur_t += vector([0,1])
-            elif genname == 'Ty':
-                cur_t += vector([1,0])
+            if genname == 'f1':
+                cur_t = vector([0,1])
+            elif genname == 'f2':
+                cur_t = vector([1,0])
             else:
-                continue
+                print "unexpected genname:", genname
+                assert False
 
             t += cur_t*power
+
         return t
 
     def as_matrix_representative(self):
-        return affine_translation_from_translation_vector_sage(self.to_translation_vector)
+        if self._matrix_representative is None:
+            self._matrix_representative = affine_transformation_from_translation_vector_sage(self.to_translation_vector())
+        return self._matrix_representative
 
     def as_matrix_representative_numpy_int(self):
         raise NotImplementedError
@@ -82,8 +92,22 @@ class MagneticTorusTranslationGroupElement(MatrixQuotientGroupElement):
         return self.G.element_to_index(self)
 
 class MagneticTorusTranslationGroup(object):
+    def __iter__(self):
+        return iter(self.elts)
+
+    def element_from_gap(self, g):
+        return MagneticTorusTranslationGroupElement(self, g)
+    
     def element_to_index(self, e):
-        raise NotImplementedError
+        strrepr = str(e.gaprepr)
+        try:
+            return self.elt_index_by_strrepr[strrepr]
+        except KeyError:
+            for (i,g) in enumerate(self.elts):
+                if g == e:
+                    self.elt_index_by_strrepr[strrepr] = i
+                    return i
+            raise KeyError
 
     def element_by_index(self, i):
         return self.elts[i]
@@ -129,17 +153,30 @@ class MagneticTorusTranslationGroup(object):
         for i in xrange(1,An):
             flux *= Agens[i]**fluxcoeffs[i]
 
-        relations = [ Tx*Ty*Tx**(-1)*Ty**(-1)*flux**(-1) ]
+        relations = [ gap.Comm(Tx,Ty)*flux ]
         for i in xrange(An):
             relations.append(Agens[i] ** A_torsion_coeffs[i])
-            relations.append(Tx*Agens[i]*Tx**(-1)*Agens[i])
+            relations.append(gap.Comm(Tx, Agens[i]))
+            relations.append(gap.Comm(Ty, Agens[i]))
         relations.append(Tx**Lx)
         relations.append(Ty**Ly)
+
+        for i in xrange(An):
+            for j in xrange(1,An):
+                relations.append(gap.Comm(Agens[i], Agens[j]))
 
         relations = gap(relations)
         self.gapgrp = gap(F.name() + ' / ' + relations.name())
         self.elts = list(MagneticTorusTranslationGroupElement(self, g) for g in gap.List(self.gapgrp))
         self._gens = list(MagneticTorusTranslationGroupElement(self,g) for g in gap.GeneratorsOfGroup(self.gapgrp))
+
+        self.gap_transgrp = gap.FreeAbelianGroup(2)
+        gap_transgrp_gens = gap.GeneratorsOfGroup(self.gap_transgrp)
+        self.homo_to_gap_transgrp = gap.GroupHomomorphismByImagesNC(self.gapgrp, self.gap_transgrp,
+                gap.GeneratorsOfGroup(self.gapgrp),
+                [ gap_transgrp_gens[1], gap_transgrp_gens[2] ] + [ gap.Identity(self.gap_transgrp) ]*An
+                )
+        self.elt_index_by_strrepr = {}
 
 class GapAffineQuotientGroup(object):
     def _base_init(self):
@@ -433,7 +470,7 @@ def translation_generators_numpy(d, scale=1, with_inverses=False):
 
 def affine_transformation_from_translation_vector_sage(v):
     d = len(v)
-    A = matrix(ZZ, n+1, n+1)
+    A = matrix(ZZ, d+1, d+1)
     for i in xrange(d):
         A[i,i] = 1
     A[0:d,d] = v

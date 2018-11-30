@@ -73,12 +73,12 @@ def space_group_orthogonality_matrix(d,G):
 
     raise RuntimeError, "Could not find orthogonality matrix!"
 
-def wigner_seitz_cplx(d, spacegrp, L=None):
-    basepoints = set(good_atom_locations(d, spacegrp,L))
+def wigner_seitz_cplx(d, spacegrp, L):
+    basepoints = set(good_atom_locations(d, spacegrp,[L]*d))
     Q = space_group_orthogonality_matrix(d, spacegrp)
 
     gens = [ 
-            equichain.PointInUniverseTranslationAction(gen.sage()) 
+            equichain.PointInUniverseTranslationAction(L*vector(gen.sage()))
             for gen in gap.TranslationBasis(spacegrp)
             ]
 
@@ -110,13 +110,13 @@ def wigner_seitz_cplx(d, spacegrp, L=None):
     return cplx
 
 def space_group_wigner_seitz_barycentric_subdivision(d, G, L=1):
-    c = wigner_seitz_cplx(d, G, [L]*d)
+    c = wigner_seitz_cplx(d, G, L)
 
     c2 = c.barycentric_subdivision()
 
     #gens = list(translation_generators_numpy(ndims,scale=scale,with_inverses=True))
     gens = [ 
-            equichain.PointInUniverseTranslationAction(L*gen.sage()) 
+            equichain.PointInUniverseTranslationAction(L*vector(gen.sage()))
             for gen in gap.TranslationBasis(G)
             ]
     equiv_relation = equichain.EquivalenceRelationFromCommutingActionGenerators(gens,
