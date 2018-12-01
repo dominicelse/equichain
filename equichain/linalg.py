@@ -513,7 +513,6 @@ class MagmaMatrix(GenericMatrix):
         # Although Magma always returns a dense matrix, empirically the number of nonzero entries is
         # often quite low. So it can be more efficient to convert back to a sparse matrix.
         if self.density == 'sparse' and ret.count_nonzero() < 0.1 * ret.nrows() * ret.ncols():
-            print "Converting Magma output to sparse..."
             return ret.to_magmasparse()
         else:
             return ret

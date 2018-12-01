@@ -76,8 +76,6 @@ cdef long int check_strtol(const char* s):
     return ret
 
 def scipy_sparse_matrix_from_magma(A, sparse_matrix_class=sparse.coo_matrix):
-    print >>sys.stderr, "Nonzero entries:", magma.NNZEntries(A)
-
     seq = magma.ElementToSequence(A)
     length = int(magma('#' + seq.name()))
     sseq_py = str(seq)
