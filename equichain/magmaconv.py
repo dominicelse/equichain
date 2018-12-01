@@ -2,9 +2,12 @@ from sage.all import *
 from scipy import sparse
 import itertools
 import numpy
+import sys
 
 import contextlib
 import magmaconv_cython
+
+from magmaconv_cython import scipy_sparse_matrix_from_magma
 
 @contextlib.contextmanager
 def printoptions(*args, **kwargs):
@@ -58,25 +61,5 @@ def magma_dense_matrix_from_numpy(A, ring):
     ring = convert_sage_ring_to_magma(ring)
     return magmaconv_cython.numpy_int_matrix_to_magma(A,ring)
 
-def scipy_sparse_matrix_from_magma(A, sparse_matrix_class=sparse.coo_matrix):
-    magmadata = eval(str(magma.ElementToSequence(A)).replace('<','(').replace('>',')'))
-
-    data = numpy.empty( len(magmadata), dtype=int)
-    i = numpy.empty( len(magmadata), dtype=int)
-    j = numpy.empty( len(magmadata), dtype=int)
-    for k,tup in enumerate(magmadata):
-        i[k] = tup[0]-1
-        j[k] = tup[1]-1
-        data[k] = tup[2]
-
-    Acoo = sparse.coo_matrix((data, (i,j)), (int(magma.Nrows(A)), int(magma.Ncols(A))))
-
-    if sparse_matrix_class is sparse.coo_matrix:
-        A = Acoo
-    else:
-        A = sparse_matrix_class(Acoo)
-
-    return A
-        
 def numpy_dense_matrix_from_magma(A):
     return magmaconv_cython.magma_to_numpy_int_matrix(A)
