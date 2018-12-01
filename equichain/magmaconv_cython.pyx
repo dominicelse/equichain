@@ -1,7 +1,9 @@
 from libcpp.string cimport string
-from libc.string cimport strtok
-from libc.stdlib cimport atoi
+from libc.string cimport strtok,strspn,strchr
+from libc.stdlib cimport atoi,strtol
+from scipy import sparse
 import numpy
+import sys
 cimport numpy as np
 
 from sage.interfaces.magma import magma
@@ -59,3 +61,67 @@ def numpy_int_matrix_to_magma(A,ring):
     s += <char*>("]")
 
     return magma.Matrix(ring, A.shape[0], A.shape[1], magma(s))
+
+cdef const char* check_strchr(const char* s, int c):
+    cdef const char* ret = strchr(s,c)
+    if ret == NULL:
+        raise IndexError
+    return ret
+
+cdef long int check_strtol(const char* s):
+    cdef char* endptr
+    cdef int ret = strtol(s, &endptr, 10)
+    if endptr == s:
+        raise ValueError
+    return ret
+
+def scipy_sparse_matrix_from_magma(A, sparse_matrix_class=sparse.coo_matrix):
+    print >>sys.stderr, "Nonzero entries:", magma.NNZEntries(A)
+
+    seq = magma.ElementToSequence(A)
+    length = int(magma('#' + seq.name()))
+    sseq_py = str(seq)
+    del seq
+    cdef const char* sseq = sseq_py
+    #cdef const char* sseq = sseq_py
+
+    data = numpy.empty( length, dtype=int)
+    i = numpy.empty( length, dtype=int)
+    j = numpy.empty( length, dtype=int)
+
+    cdef np.int_t [:] i_c = i
+    cdef np.int_t [:] j_c = j
+    cdef np.int_t [:] data_c = data
+
+    cdef const char* curpos=sseq
+    cdef int k=0
+
+    for k in range(length):
+        curpos = check_strchr(curpos, '<')
+        curpos += 1
+        i_c[k] = check_strtol(curpos)-1
+
+        curpos = check_strchr(curpos, ',')
+        curpos += 1
+        curpos += strspn(curpos, " ")
+        j_c[k] = check_strtol(curpos)-1
+
+        curpos = check_strchr(curpos, ',')
+        curpos += 1
+        curpos += strspn(curpos, " ") 
+        data_c[k] = check_strtol(curpos)
+
+        k += 1
+
+    del sseq_py
+
+    assert k == length
+
+    Acoo = sparse.coo_matrix((data, (i,j)), (int(magma.Nrows(A)), int(magma.Ncols(A))))
+
+    if sparse_matrix_class is sparse.coo_matrix:
+        A = Acoo
+    else:
+        A = sparse_matrix_class(Acoo)
+
+    return A
