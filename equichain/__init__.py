@@ -37,6 +37,16 @@ class PointInUniverse(object):
             self.coords = copy(vector(QQ, coords))
         self.coords.set_immutable()
 
+    def __truediv__(self, m):
+        return self.__div__(m)
+
+    def __div__(self, m):
+        return PointInUniverse(self.universe, self.coords / m)
+
+    def __add__(a,b):
+        assert a.universe is b.universe
+        return PointInUniverse(a.universe, a.coords + b.coords)
+
     def __hash__(self):
         return hash(self.coords)
 
@@ -231,6 +241,14 @@ class ConvexHullCell(object):
         i = (pt.coords for pt in self.points)
         return (i.next() + sum(i)) / len(self.points)
 
+    def center(self):
+        points = list(self.points)
+        sm = points[0]
+        for p in points[1:]:
+            sm = sm + p
+        return sm / len(points)
+
+
     def forget_orientation(self):
         return ConvexHullCell(self.points, None)
 
@@ -328,7 +346,7 @@ class QuotientCell(object):
         return "QUOTIENT:" + str(self.representative_cell)
 
 class EquivalenceRelationFromCommutingActionGenerators(object):
-    def __init__(self, gens, representatives, default_max_order=5,
+    def __init__(self, gens, representatives, default_max_order=6,
             reduce_order=None, precompute_representatives_for=None,
             representatives_helper=None):
         self.gens = gens
@@ -849,6 +867,12 @@ class OrderedSimplex(object):
 
     def act_with(self,action):
         return OrderedSimplex(v.act_with(action) for v in self.vertices)
+
+    def center(self):
+        sm = self.vertices[0].center()
+        for v in self.vertices[1:]:
+            sm = sm + v.center()
+        return sm / len(self.vertices)
 
     def __str__(self):
         return repr(self)
