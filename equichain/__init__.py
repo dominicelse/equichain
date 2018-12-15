@@ -346,7 +346,7 @@ class QuotientCell(object):
         return "QUOTIENT:" + str(self.representative_cell)
 
 class EquivalenceRelationFromCommutingActionGenerators(object):
-    def __init__(self, gens, representatives, default_max_order=6,
+    def __init__(self, gens, representatives, default_max_order=7,
             reduce_order=None, precompute_representatives_for=None,
             representatives_helper=None):
         self.gens = gens
