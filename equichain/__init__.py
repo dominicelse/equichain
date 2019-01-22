@@ -676,6 +676,27 @@ def get_stabilizer_group(cell,G):
     except AttributeError:
         return gs
 
+def lift_cocycle_from_stabilizer_groups(cells, cell_cochain_fns, n,G, twist):
+    delta = cython_fns.get_group_coboundary_matrix(cells, n, G, twist)
+
+    constrained_indices = []
+    indexer = ComplexChainIndexer(n=n,G=G,cells=cells)
+    constrained_values = []
+
+    for cell_index,cell in enumerate(cells):
+        S = cell.get_stabilizer_group(G,S)
+        for gg in itertools.product(*([S]*n)):
+            constrained_indices += [ indexer( g.toindex() for g in gg ) , cell_index ]
+            constrained_values += [ cell_cochain_fns[cell_index](gg) ]
+
+    constrained_values = NumpyVectorOverZ(constrained_values)
+
+    ret = solve_matrix_equation_with_constraint(delta, constrained_indices, constrained_values)
+
+def spinlift():
+    delta = cython_fns.get_group_coboundary_matrix(cells, n, G, twist)
+
+    constrained_indices = []
 
 #def solve_matrix_equation(A, b, over_ring=ZZ):
 #    b = vector(over_ring,b)

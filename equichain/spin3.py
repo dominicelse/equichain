@@ -3,6 +3,8 @@ import numpy
 import numpy.linalg
 import scipy.linalg
 
+from sage.all import *
+
 eps = 1e-7
 
 class AntiUnitaryOperator(object):
@@ -15,9 +17,9 @@ class AntiUnitaryOperator(object):
 
     def __mul__(a, b):
         if a.n % 2:
-            matprod = numpy.dot(a, numpy.conj(b))
+            matprod = numpy.dot(a.mat, numpy.conj(b.mat))
         else:
-            matprod = numpy.dot(a, b)
+            matprod = numpy.dot(a.mat, b.mat)
 
         return AntiUnitaryOperator(matprod, (a.n + b.n) % 2)
 
@@ -26,6 +28,37 @@ class AntiUnitaryOperator(object):
             return repr(self.mat) + "*K"
         else:
             return repr(self.mat)
+
+def convert_to_numpy(x):
+    if isinstance(x, GapElement):
+        return matrix(x.sage()).numpy()
+    else:
+        return x
+
+def spin_cocycle(g1,g2, additive=False):
+    g1,g2 = (convert_to_numpy(g) for g in (g1,g2)) 
+    g1g2 = g1.dot(g2)
+
+    Ug1,Ug2,Ug1g2 = (preimage_of_O3_element_in_spinhalfrep(g) for g in (g1,g2,g1g2))
+
+    if numpy.linalg.norm( (Ug1*Ug2).mat - Ug1g2.mat) < eps:
+        return 0 if additive else 1
+    elif numpy.linalg.norm( (Ug1*Ug2).mat + Ug1g2.mat ) < eps:
+        return Integer(1)/2 if additive else -1
+    else:
+        assert False
+
+def spin_3cocycle(g1,g2,g3):
+    g1,g2,g3 = (convert_to_numpy(g) for g in (g1,g2,g3)) 
+
+    p1 = int(numpy.linalg.det(g1))
+
+    w = lambda a,b: spin_cocycle(a,b,additive=True)
+
+    ret = p1*w(g2,g3) - w(g1.dot(g2), g3) + w(g1, g2.dot(g3)) - w(g1,g2)
+    assert ret in ZZ
+    return ret
+
 
 def preimage_of_O3_element_in_spinhalfrep(A):
     # Returns (U,m) such that the corresponding action on a spin-1/2 is UK^m
@@ -47,6 +80,13 @@ def preimage_of_O3_element_in_spinhalfrep(A):
         isigmay = numpy.array([[0,1],[-1,0]])
         return AntiUnitaryOperator(numpy.dot(Aso_spinhalf, isigmay),1)
 
+def levi_civita_tensor(d):
+    Sd = SymmetricGroup(d)
+    A = numpy.zeros( [d]*d, dtype=int)
+    for g in Sd:
+        A[tuple(i-1 for i in g.tuple())] = g.sign()
+    return A
+
 def preimage_of_SO3_element_in_SU2(A):
     # Check A is in SO(3)
     assert A.shape == (3,3)
@@ -54,35 +94,39 @@ def preimage_of_SO3_element_in_SU2(A):
     assert numpy.abs(numpy.linalg.det(A)-1) < eps
     assert numpy.linalg.norm(numpy.dot(numpy.transpose(A),A) - numpy.eye(3)) < eps
 
+    if numpy.linalg.norm(A - numpy.eye(3)) < eps:
+        return numpy.eye(2)
+
     # Compute the matrix logarithm of A. The problem is that matrix logarithm is not unique
     # and we want a particular one [the one that is real and anti-symmetric].
-    # The reason why taking the log of the eigenvalues works is that the eigenvalues of an SO(3)
-    # matrix are always of the form {e^{it}, 0, e^{-it}} for some real t in [-pi,pi]. Because numpy guarantees that
-    # the imag part of the log will be in [-pi,pi], it follows that the log of the eigenvalues gives {it,0.-it}.
-    # The case where t is close to +/- pi requires special handling.
 
     w, vl = scipy.linalg.eig(A)
 
-    wlog = numpy.log(w)
+    one_eigindices = numpy.nonzero(numpy.abs(w-1) < eps)[0]
+    assert len(one_eigindices) == 1
+    one_eigindex = one_eigindices[0]
+    other_eigindices = list(set([0,1,2]) - set([one_eigindex]))
+    assert len(other_eigindices) == 2
 
-    piindices = numpy.nonzero(numpy.abs(numpy.abs(wlog) - numpy.pi) < eps)[0]
-    if len(piindices) == 2:
-        wlog[piindices[0]] = 1j*numpy.pi
-        wlog[piindices[1]] = -1j*numpy.pi
-    elif len(piindices) != 0:
-        assert False
+    assert numpy.abs(w[other_eigindices[0]] * w[other_eigindices[1]]-1) < eps
 
-    Alog = numpy.dot(vl, numpy.dot(numpy.diag(wlog), numpy.linalg.inv(vl)))
+    theta = -1j*numpy.log(w[other_eigindices[0]])
+    assert numpy.abs(numpy.imag(theta)) < eps
 
-    assert numpy.linalg.norm(numpy.real(Alog)) < eps
-    assert numpy.linalg.norm(Alog + numpy.conj(numpy.transpose(Alog))) < eps
-    assert numpy.linalg.norm(scipy.linalg.expm(Alog) - A) < eps
+    axis = vl[:,one_eigindex]
+    assert numpy.linalg.norm(numpy.imag(axis)) < eps
 
-    spin1_lie_basis = [
-            1/numpy.sqrt(2)*numpy.array([[0,1,0],[1,0,1],[0,1,0]]),
-            -1j/numpy.sqrt(2)*numpy.array([[0,1,0],[-1,0,1],[0,-1,0]]),
-            numpy.array([[1,0,0],[0,0,0],[0,0,-1]])
-            ]
+    levi_civita = levi_civita_tensor(3)
+
+    spin1_lie_basis = [None]*3
+    for i in xrange(3):
+        spin1_lie_basis[i] = levi_civita[i,:,:]
+
+    Alog = sum(axis[i]*theta*spin1_lie_basis[i] for i in xrange(len(spin1_lie_basis)))
+    if numpy.linalg.norm(scipy.linalg.expm(Alog) - A) > eps:
+        theta = -theta
+        Alog = -Alog
+        assert numpy.linalg.norm(scipy.linalg.expm(Alog)-A) < eps
 
     spinhalf_lie_basis = [
         0.5*numpy.array([[0,1],[1,0]]),
@@ -90,6 +134,5 @@ def preimage_of_SO3_element_in_SU2(A):
         0.5*numpy.array([[1,0],[0,-1]])
         ]
 
-    coeffs = [ numpy.trace(numpy.dot(numpy.transpose(el), Alog)) for el in spin1_lie_basis ] 
-    Alog_su2 = sum(coeffs[i]*spinhalf_lie_basis[i] for i in xrange(len(spin1_lie_basis)))
-    return scipy.linalg.expm(Alog_su2)
+    Alog_su2 = theta*sum(axis[i]*spinhalf_lie_basis[i] for i in xrange(len(spinhalf_lie_basis)))
+    return scipy.linalg.expm(1j*Alog_su2)
