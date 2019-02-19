@@ -61,7 +61,7 @@ def spin_3cocycle(g1,g2,g3):
 
     ret = p1*w(g2,g3) - w(g1.dot(g2), g3) + w(g1, g2.dot(g3)) - w(g1,g2)
     assert ret in ZZ
-    return ret
+    return Integer(ret)
 
 
 def preimage_of_O3_element_in_spinhalfrep(A):

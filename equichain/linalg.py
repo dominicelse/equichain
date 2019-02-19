@@ -20,10 +20,10 @@ else:
     patched_sage = False
     print "WARNING: patched Sage not found; performance will be much slower"
 
-def coefficients_of_quotient(A,B=None):
+def coefficients_of_quotient(A,B):
     """ Let V and W be the column spaces of A and B respectively, and assume that V <= W.
     We require that the columns of B be linearly independent (not necessary for A).
-    This function returns the torsion coefficients of V/W. 
+    This function returns the torsion coefficients of W/V.
 
     If B is None, then W is the free module of dimension A.nrows().
     """
@@ -43,10 +43,17 @@ def kernel_mod_image(d1,d2, return_module_obj=False):
     #   or, if return_module_obj=True, return (ker d1)/(im d2) as a Sage module object.
 
     if return_module_obj:
-        d1,d2 = (x.to_sagedense().A for x in (d1,d2))
-        return d1.kernel().quotient(d2.column_module())
+        if d1 is not None:
+            d1,d2 = (x.to_sagedense().A for x in (d1,d2))
+            return d1.right_kernel().quotient(d2.column_module())
+        else:
+            d2 = d2.to_sagedense().A
+            return (d2.base_ring()**d2.nrows()).quotient(d2.column_module())
     else:
-        kernel = d1.right_kernel_matrix()
+        if d1 is not None:
+            kernel = d1.right_kernel_matrix()
+        else:
+            kernel = None
         return coefficients_of_quotient(d2,kernel)
 
 

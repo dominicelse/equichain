@@ -690,10 +690,10 @@ def lift_cocycle_from_stabilizer_groups(cells, cell_cochain_fns, n,G, twist):
             constrained_indices += [ indexer([g.toindex() for g in gg], cell_index ) ]
             constrained_values += [ cell_cochain_fns(cell_index, *gg) ]
 
-    constrained_values = NumpyVectorOverZ(constrained_values)
+    constrained_values = NumpyVectorOverZ(array(constrained_values,dtype=int))
 
     ret = solve_matrix_equation_with_constraint(delta, constrained_indices, constrained_values)
-    return ret.v
+    return ret.to_sagevector().v
 
 def spinlift(cells, z2_0chain, G):
     n=3
@@ -705,6 +705,26 @@ def spinlift(cells, z2_0chain, G):
     twist = TwistedIntegers.from_orientation_reversing(G)
 
     return lift_cocycle_from_stabilizer_groups(cells, cell_cochain_fns,n,G,twist)
+
+def soc_module_map(cplx, G):
+    twist = TwistedIntegers.from_orientation_reversing(G)
+
+    soc_E2_page = E2page(cplx,3,0,G,twist,ZZ,'python_bar', return_module_obj=True)
+    nosoc_E2_page = E2page(cplx,0,0,G,twist,GF(2),'python_bar',return_module_obj=True)
+
+    assert all(inv == 2 for inv in soc_E2_page.invariants())
+
+    A = matrix( GF(2),  (len(soc_E2_page.invariants()), nosoc_E2_page.dimension()) )
+
+    for i,b in enumerate(nosoc_E2_page.basis()):
+        blift = spinlift(cplx.cells[0], b, G)
+        blift_coords = soc_E2_page.coordinate_vector(blift, reduce=True)
+        A[:,i] = blift_coords
+
+    k = A.kernel()
+    for v in k.basis():
+        print soc_E2_page.lift(v)
+    print "...."
 
 #def solve_matrix_equation(A, b, over_ring=ZZ):
 #    b = vector(over_ring,b)
@@ -1138,10 +1158,7 @@ def Enpage_helper(img,  cplx,n,k,G,twist,ring,resolution, return_module_obj=Fals
 
         return kernel_mod_image(delta0_out, img, return_module_obj)
     else:
-        if return_module_obj:
-            raise NotImplementedError
-        else:
-            return coefficients_of_quotient(img)
+        return kernel_mod_image(None, img, return_module_obj)
 
 def E3page(cplx,n,k,G,twist,ring, resolution):
     d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G, resolution=resolution)
