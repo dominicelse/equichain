@@ -690,17 +690,17 @@ def lift_cocycle_from_stabilizer_groups(cells, cell_cochain_fns, n,G, twist):
             constrained_indices += [ indexer([g.toindex() for g in gg], cell_index ) ]
             constrained_values += [ cell_cochain_fns(cell_index, *gg) ]
 
-    constrained_values = NumpyVectorOverZ(array(constrained_values,dtype=int))
+    constrained_values = NumpyVectorOverZ(numpy.array(constrained_values, dtype=int))
 
     ret = solve_matrix_equation_with_constraint(delta, constrained_indices, constrained_values)
-    return ret.to_sagevector().v
+    return ret.to_sagedense().v
 
 def spinlift(cells, z2_0chain, G):
     n=3
 
     def cell_cochain_fns(cell_index, g1,g2,g3):
         asm1,asm2,asm3 = (g.as_matrix_representative()[0:3,0:3].numpy() for g in (g1,g2,g3))
-        return (z2_0chain[cell_index] % 2) * spin3.spin_3cocycle(asm1,asm2,asm3)
+        return int((z2_0chain[cell_index] % 2) * spin3.spin_3cocycle(asm1,asm2,asm3))
 
     twist = TwistedIntegers.from_orientation_reversing(G)
 
@@ -714,7 +714,7 @@ def soc_module_map(cplx, G):
 
     assert all(inv == 2 for inv in soc_E2_page.invariants())
 
-    A = matrix( GF(2),  (len(soc_E2_page.invariants()), nosoc_E2_page.dimension()) )
+    A = matrix( GF(2),  len(soc_E2_page.invariants()), nosoc_E2_page.dimension() )
 
     for i,b in enumerate(nosoc_E2_page.basis()):
         blift = spinlift(cplx.cells[0], b, G)
