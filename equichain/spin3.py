@@ -2,8 +2,10 @@ from __future__ import division
 import numpy
 import numpy.linalg
 import scipy.linalg
+import equichain.linalg
 
 from sage.all import *
+from sage.interfaces.gap import GapElement
 
 eps = 1e-7
 
@@ -32,6 +34,8 @@ class AntiUnitaryOperator(object):
 def convert_to_numpy(x):
     if isinstance(x, GapElement):
         return matrix(x.sage()).numpy()
+    elif isinstance(x, equichain.linalg.GenericMatrix):
+        return x.to_numpydense().A
     else:
         return x
 
