@@ -14,6 +14,7 @@ from equichain.grps import *
 from equichain.sageutils import *
 import equichain.resolutions as resolutions
 from equichain.linalg import *
+from equichain import spin3
 from sage.all import *
 
 from equichain import wigner_seitz
@@ -684,19 +685,26 @@ def lift_cocycle_from_stabilizer_groups(cells, cell_cochain_fns, n,G, twist):
     constrained_values = []
 
     for cell_index,cell in enumerate(cells):
-        S = cell.get_stabilizer_group(G,S)
+        S = get_stabilizer_group(cell, G)
         for gg in itertools.product(*([S]*n)):
-            constrained_indices += [ indexer( g.toindex() for g in gg ) , cell_index ]
-            constrained_values += [ cell_cochain_fns[cell_index](gg) ]
+            constrained_indices += [ indexer([g.toindex() for g in gg], cell_index ) ]
+            constrained_values += [ cell_cochain_fns(cell_index, *gg) ]
 
     constrained_values = NumpyVectorOverZ(constrained_values)
 
     ret = solve_matrix_equation_with_constraint(delta, constrained_indices, constrained_values)
+    return ret.v
 
-def spinlift():
-    delta = cython_fns.get_group_coboundary_matrix(cells, n, G, twist)
+def spinlift(cells, z2_0chain, G):
+    n=3
 
-    constrained_indices = []
+    def cell_cochain_fns(cell_index, g1,g2,g3):
+        asm1,asm2,asm3 = (g.as_matrix_representative()[0:3,0:3].numpy() for g in (g1,g2,g3))
+        return (z2_0chain[cell_index] % 2) * spin3.spin_3cocycle(asm1,asm2,asm3)
+
+    twist = TwistedIntegers.from_orientation_reversing(G)
+
+    return lift_cocycle_from_stabilizer_groups(cells, cell_cochain_fns,n,G,twist)
 
 #def solve_matrix_equation(A, b, over_ring=ZZ):
 #    b = vector(over_ring,b)
@@ -1118,7 +1126,7 @@ def test_has_solution(fn):
             raise
     return True
 
-def Enpage_helper(img,  cplx,n,k,G,twist,ring,resolution):
+def Enpage_helper(img,  cplx,n,k,G,twist,ring,resolution, return_module_obj=False):
     if n > 0:
         delta0_in = cplx.get_group_coboundary_matrix(n=(n-1), k=k, G=G, twist=twist, resolution=resolution)
 
@@ -1128,9 +1136,12 @@ def Enpage_helper(img,  cplx,n,k,G,twist,ring,resolution):
 
         delta0_out = cplx.get_group_coboundary_matrix(n=n, k=k, G=G, twist=twist, resolution=resolution)
 
-        return kernel_mod_image(delta0_out, img)
+        return kernel_mod_image(delta0_out, img, return_module_obj)
     else:
-        return coefficients_of_quotient(img)
+        if return_module_obj:
+            raise NotImplementedError
+        else:
+            return coefficients_of_quotient(img)
 
 def E3page(cplx,n,k,G,twist,ring, resolution):
     d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G, resolution=resolution)
@@ -1228,7 +1239,7 @@ def E1page(cplx,n,k,G,twist,ring,resolution):
         delta0_out = cplx.get_group_coboundary_matrix(n=n, k=k, G=G, twist=twist, resolution=resolution)
         return kernel_mod_image(delta0_out, delta0_in)
 
-def E2page(cplx,n,k,G,twist,ring,resolution):
+def E2page(cplx,n,k,G,twist,ring,resolution, return_module_obj=False):
     d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G, resolution=resolution)
     delta1 = cplx.get_group_coboundary_matrix(n=n, k=(k+1), G=G, twist=twist, resolution=resolution)
 
@@ -1236,7 +1247,7 @@ def E2page(cplx,n,k,G,twist,ring,resolution):
 
     img = image_of_constrained_subspace(d1, delta1, basis=False)
 
-    return Enpage_helper(img, cplx,n,k,G,twist,ring,resolution)
+    return Enpage_helper(img, cplx,n,k,G,twist,ring,resolution, return_module_obj=return_module_obj)
 
 def find_E2_trivializer(cplx, a, n, k, G, ring):
     d = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G)
