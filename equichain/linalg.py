@@ -38,12 +38,16 @@ def coefficients_of_quotient(A,B=None):
     return [n for n in X.elementary_divisors() if n != 1]
 
 
-def kernel_mod_image(d1,d2):
+def kernel_mod_image(d1,d2, return_module_obj=False):
     # Returns the torsion coefficients of (ker d1)/(im d2), where d1 d2 = 0
+    #   or, if return_module_obj=True, return (ker d1)/(im d2) as a Sage module object.
 
-    kernel = d1.right_kernel_matrix()
-
-    return coefficients_of_quotient(d2,kernel)
+    if return_module_obj:
+        d1,d2 = (x.to_sagedense().A for x in (d1,d2))
+        return d1.kernel().quotient(d2.column_module())
+    else:
+        kernel = d1.right_kernel_matrix()
+        return coefficients_of_quotient(d2,kernel)
 
 
 def isiterable_or_slice(i):
