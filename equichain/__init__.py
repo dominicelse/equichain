@@ -682,13 +682,14 @@ def lift_cocycle_from_stabilizer_groups(cells, cell_cochain_fns, n,G, twist):
 
     constrained_indices = []
     indexer = ComplexChainIndexer(n=n,G=G,cells=cells)
-    constrained_values = []
+    constrained_values = numpy.empty(indexer.total_dim(), dtype=int)
 
     for cell_index,cell in enumerate(cells):
         S = get_stabilizer_group(cell, G)
         for gg in itertools.product(*([S]*n)):
-            constrained_indices += [ indexer([g.toindex() for g in gg], cell_index ) ]
-            constrained_values += [ cell_cochain_fns(cell_index, *gg) ]
+            i = indexer([g.toindex() for g in gg], cell_index)
+            constrained_indices += [ i ]
+            constrained_values[i] = cell_cochain_fns(cell_index, *gg)
 
     constrained_values = NumpyVectorOverZ(numpy.array(constrained_values, dtype=int))
 
@@ -710,6 +711,7 @@ def soc_module_map(cplx, G):
     twist = TwistedIntegers.from_orientation_reversing(G)
 
     soc_E2_page = E2page(cplx,3,0,G,twist,ZZ,'python_bar', return_module_obj=True)
+    soc_E1_page = E1page(cplx,3,0,G,twist,ZZ,'python_bar', return_module_obj=True)
     nosoc_E2_page = E2page(cplx,0,0,G,twist,GF(2),'python_bar',return_module_obj=True)
 
     assert all(inv == 2 for inv in soc_E2_page.invariants())
@@ -717,13 +719,16 @@ def soc_module_map(cplx, G):
     A = matrix( GF(2),  len(soc_E2_page.invariants()), nosoc_E2_page.dimension() )
 
     for i,b in enumerate(nosoc_E2_page.basis()):
-        blift = spinlift(cplx.cells[0], b, G)
+        blift = spinlift(cplx.cells[0], nosoc_E2_page.lift(b), G)
         blift_coords = soc_E2_page.coordinate_vector(blift, reduce=True)
         A[:,i] = blift_coords
 
-    k = A.kernel()
+    k = A.right_kernel()
     for v in k.basis():
-        print soc_E2_page.lift(v)
+        b = nosoc_E2_page.lift(v)
+        blift = spinlift(cplx.cells[0], b, G)
+        if not all(x == 0 for x in soc_E1_page.coordinate_vector(blift,reduce=True)):
+            print b
     print "...."
 
 #def solve_matrix_equation(A, b, over_ring=ZZ):
@@ -1244,8 +1249,11 @@ def akernel(cplx,n,k,G,twist,ring,resolution):
 
     return delta1.right_kernel_matrix()
 
-def E1page(cplx,n,k,G,twist,ring,resolution):
+def E1page(cplx,n,k,G,twist,ring,resolution, return_module_obj=False):
     if n == 0:
+        if return_module_obj:
+            raise NotImplementedError
+
         if ring.order() == oo:
             order = 0
         else:
@@ -1254,7 +1262,7 @@ def E1page(cplx,n,k,G,twist,ring,resolution):
     else:
         delta0_in = cplx.get_group_coboundary_matrix(n=(n-1), k=k, G=G, twist=twist, resolution=resolution)
         delta0_out = cplx.get_group_coboundary_matrix(n=n, k=k, G=G, twist=twist, resolution=resolution)
-        return kernel_mod_image(delta0_out, delta0_in)
+        return kernel_mod_image(delta0_out, delta0_in, return_module_obj)
 
 def E2page(cplx,n,k,G,twist,ring,resolution, return_module_obj=False):
     d1 = cplx.get_boundary_matrix_group_cochain(n=n,k=(k+1),G=G, resolution=resolution)

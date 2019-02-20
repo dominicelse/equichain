@@ -442,6 +442,8 @@ def solve_matrix_equation_with_constraint(A, subs_indices, xconstr):
     notsubs_indices_set = frozenset(xrange(A.shape[1])) - subs_indices_set
     notsubs_indices_list = list(notsubs_indices_set)
 
+    assert len(xconstr) == A.shape[1]
+
     xconstr_reduced = xconstr[subs_indices_list]
 
     A_reduced_1 = A[:,notsubs_indices_list]

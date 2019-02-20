@@ -91,52 +91,67 @@ def levi_civita_tensor(d):
         A[tuple(i-1 for i in g.tuple())] = g.sign()
     return A
 
-def preimage_of_SO3_element_in_SU2(A):
-    # Check A is in SO(3)
-    assert A.shape == (3,3)
-    assert numpy.linalg.norm(numpy.imag(A)) < eps
-    assert numpy.abs(numpy.linalg.det(A)-1) < eps
-    assert numpy.linalg.norm(numpy.dot(numpy.transpose(A),A) - numpy.eye(3)) < eps
+class PreimageOfSO3ElementInSU2Cacher(object):
+    def __init__(self):
+        self.cached_values = {}
 
-    if numpy.linalg.norm(A - numpy.eye(3)) < eps:
-        return numpy.eye(2)
+    def _compute(self, A):
+        # Check A is in SO(3)
+        assert A.shape == (3,3)
+        assert numpy.linalg.norm(numpy.imag(A)) < eps
+        assert numpy.abs(numpy.linalg.det(A)-1) < eps
+        assert numpy.linalg.norm(numpy.dot(numpy.transpose(A),A) - numpy.eye(3)) < eps
 
-    # Compute the matrix logarithm of A. The problem is that matrix logarithm is not unique
-    # and we want a particular one [the one that is real and anti-symmetric].
+        if numpy.linalg.norm(A - numpy.eye(3)) < eps:
+            return numpy.eye(2)
 
-    w, vl = scipy.linalg.eig(A)
+        # Compute the matrix logarithm of A. The problem is that matrix logarithm is not unique
+        # and we want a particular one [the one that is real and anti-symmetric].
 
-    one_eigindices = numpy.nonzero(numpy.abs(w-1) < eps)[0]
-    assert len(one_eigindices) == 1
-    one_eigindex = one_eigindices[0]
-    other_eigindices = list(set([0,1,2]) - set([one_eigindex]))
-    assert len(other_eigindices) == 2
+        w, vl = scipy.linalg.eig(A)
 
-    assert numpy.abs(w[other_eigindices[0]] * w[other_eigindices[1]]-1) < eps
+        one_eigindices = numpy.nonzero(numpy.abs(w-1) < eps)[0]
+        assert len(one_eigindices) == 1
+        one_eigindex = one_eigindices[0]
+        other_eigindices = list(set([0,1,2]) - set([one_eigindex]))
+        assert len(other_eigindices) == 2
 
-    theta = -1j*numpy.log(w[other_eigindices[0]])
-    assert numpy.abs(numpy.imag(theta)) < eps
+        assert numpy.abs(w[other_eigindices[0]] * w[other_eigindices[1]]-1) < eps
 
-    axis = vl[:,one_eigindex]
-    assert numpy.linalg.norm(numpy.imag(axis)) < eps
+        theta = -1j*numpy.log(w[other_eigindices[0]])
+        assert numpy.abs(numpy.imag(theta)) < eps
 
-    levi_civita = levi_civita_tensor(3)
+        axis = vl[:,one_eigindex]
+        assert numpy.linalg.norm(numpy.imag(axis)) < eps
 
-    spin1_lie_basis = [None]*3
-    for i in xrange(3):
-        spin1_lie_basis[i] = levi_civita[i,:,:]
+        levi_civita = levi_civita_tensor(3)
 
-    Alog = sum(axis[i]*theta*spin1_lie_basis[i] for i in xrange(len(spin1_lie_basis)))
-    if numpy.linalg.norm(scipy.linalg.expm(Alog) - A) > eps:
-        theta = -theta
-        Alog = -Alog
-        assert numpy.linalg.norm(scipy.linalg.expm(Alog)-A) < eps
+        spin1_lie_basis = [None]*3
+        for i in xrange(3):
+            spin1_lie_basis[i] = levi_civita[i,:,:]
 
-    spinhalf_lie_basis = [
-        0.5*numpy.array([[0,1],[1,0]]),
-        -0.5j*numpy.array([[0,1],[-1,0]]),
-        0.5*numpy.array([[1,0],[0,-1]])
-        ]
+        Alog = sum(axis[i]*theta*spin1_lie_basis[i] for i in xrange(len(spin1_lie_basis)))
+        if numpy.linalg.norm(scipy.linalg.expm(Alog) - A) > eps:
+            theta = -theta
+            Alog = -Alog
+            assert numpy.linalg.norm(scipy.linalg.expm(Alog)-A) < eps
 
-    Alog_su2 = theta*sum(axis[i]*spinhalf_lie_basis[i] for i in xrange(len(spinhalf_lie_basis)))
-    return scipy.linalg.expm(1j*Alog_su2)
+        spinhalf_lie_basis = [
+            0.5*numpy.array([[0,1],[1,0]]),
+            -0.5j*numpy.array([[0,1],[-1,0]]),
+            0.5*numpy.array([[1,0],[0,-1]])
+            ]
+
+        Alog_su2 = theta*sum(axis[i]*spinhalf_lie_basis[i] for i in xrange(len(spinhalf_lie_basis)))
+        return scipy.linalg.expm(1j*Alog_su2)
+
+    def __call__(self, A):
+        data = str(A.data)
+        try:
+            return self.cached_values[data]
+        except KeyError:
+            ret = self._compute(A)
+            self.cached_values[data] = ret
+            return ret
+
+preimage_of_SO3_element_in_SU2 = PreimageOfSO3ElementInSU2Cacher()
