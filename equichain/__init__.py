@@ -706,7 +706,7 @@ def spinlift(cells, z2_0chain, G):
 
     def cell_cochain_fns(cell_index, g1,g2,g3):
         asm1,asm2,asm3 = (g.as_matrix_representative()[0:3,0:3].numpy() for g in (g1,g2,g3))
-        return int((z2_0chain[cell_index] % 2) * spin3.spin_3cocycle(asm1,asm2,asm3))
+        return int((int(z2_0chain[cell_index]) % 2) * spin3.spin_3cocycle(asm1,asm2,asm3))
 
     twist = TwistedIntegers.from_orientation_reversing(G)
 
