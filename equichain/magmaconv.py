@@ -7,7 +7,8 @@ import sys
 import contextlib
 import magmaconv_cython
 
-from magmaconv_cython import scipy_sparse_matrix_from_magma
+from magmaconv_cython import scipy_sparse_matrix_from_magma, numpy_matrix_from_magma,\
+        numpy_vector_from_magma
 
 @contextlib.contextmanager
 def printoptions(*args, **kwargs):
@@ -61,5 +62,6 @@ def magma_dense_matrix_from_numpy(A, ring):
     ring = convert_sage_ring_to_magma(ring)
     return magmaconv_cython.numpy_int_matrix_to_magma(A,ring)
 
-def numpy_dense_matrix_from_magma(A):
-    return magmaconv_cython.magma_to_numpy_int_matrix(A)
+def magma_vector_from_numpy(A, ring):
+    ring = convert_sage_ring_to_magma(ring)
+    return magmaconv_cython.numpy_int_vector_to_magma(A,ring)

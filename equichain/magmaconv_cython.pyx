@@ -11,7 +11,7 @@ from sage.interfaces.magma import magma
 cdef extern from "string" namespace "std":
     cdef string to_string(int)
 
-def magma_to_numpy_int_matrix(A):
+def numpy_matrix_from_magma(A):
     cdef int nrows = int(magma.Nrows(A))
     cdef int ncols = int(magma.Ncols(A))
 
@@ -40,7 +40,51 @@ def magma_to_numpy_int_matrix(A):
 
     return out
 
-def numpy_int_matrix_to_magma(A,ring):
+def numpy_vector_from_magma(A):
+    cdef int n = int(magma.Ncols(A))
+
+    out = numpy.empty( n, dtype=int )
+    cdef np.int_t [:] out_view = out
+
+    magma_str_python = str(A)
+    cdef char* magma_str = magma_str_python
+
+    cdef char* current_token
+    cdef int i
+
+    cdef char* delims = " ()\n"
+
+    for i in xrange(n):
+        if i == 0:
+            current_token = strtok(magma_str, delims)
+        else:
+            current_token = strtok(NULL, delims)
+
+        print current_token
+
+        if current_token is NULL:
+            raise ValueError
+
+        out_view[i] = atoi(current_token)
+
+    return out
+
+def numpy_int_matrix_to_magma(A, ring):
+    assert len(A.shape) == 2
+    return _numpy_int_matrix_or_vector_to_magma(A, ring)
+
+def numpy_int_vector_to_magma(A, ring):
+    assert len(A.shape) == 1
+    return _numpy_int_matrix_or_vector_to_magma(A, ring)
+
+def _numpy_int_matrix_or_vector_to_magma(A,ring):
+    if len(A.shape) == 1:
+        vector = True
+    elif len(A.shape) == 2:
+        vector = False
+    else:
+        raise ValueError
+
     Aflat = numpy.ravel(A)
 
     cdef np.int_t [:] Aview = Aflat
@@ -60,7 +104,10 @@ def numpy_int_matrix_to_magma(A,ring):
 
     s += <char*>("]")
 
-    return magma.Matrix(ring, A.shape[0], A.shape[1], magma(s))
+    if vector:
+        return magma.Vector(ring, magma(s))
+    else:
+        return magma.Matrix(ring, A.shape[0], A.shape[1], magma(s))
 
 cdef const char* check_strchr(const char* s, int c):
     cdef const char* ret = strchr(s,c)
