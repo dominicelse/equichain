@@ -79,6 +79,16 @@ class GenericMatrix(object):
     def __repr__(self):
         return repr(self.A)
 
+    def to_scipy(self):
+        if self.density == 'dense':
+            return self.to_numpydense()
+        else:
+            return self.to_scipysparse()
+
+    def dot(self, v):
+        ret = self.to_scipy().dot(v)
+        return self.convert_to_like_self_preserve_density(ret)
+
     @property
     def backend_obj(self):
         return self.A
@@ -204,24 +214,26 @@ class ScipyOrNumpyMatrixOverRingGeneric(GenericMatrix):
         return self.A.shape
 
     def convert_to_like_self_preserve_density(self,a):
-        if a.density == 'sparse':
-            return a.to_scipysparse()
-        else:
-            return a.to_numpydense()
+        return a.to_scipy()
 
 class ScipySparseMatrixOverRingGeneric(ScipyOrNumpyMatrixOverRingGeneric):
     def to_sagedense(self):
         return self.to_numpydense().to_sagedense()
 
     def dot(self, b):
+        b = b.to_scipy()
         assert self.ring == b.ring
 
         if isinstance(b, GenericVector):
             return self._vector_constructor(self.A.dot(b.v))
-        elif isinstance(b, ScipySparseMatrixOverRingGeneric):
-            return self._constructor(self.A.dot(b.A))
-        elif isinstance(b, NumpyMatrixOverRingGeneric):
-            return self.to_numpydense().dot(b)
+        elif isinstance(b, GenericMatrix):
+            b = b.to_scipy()
+            if isinstance(b, ScipySparseMatrixOverRingGeneric):
+                return self._constructor(self.A.dot(b.A))
+            elif isinstance(b, NumpyMatrixOverRingGeneric):
+                return self.to_numpydense().dot(b)
+            else:
+                assert False
         else:
             raise NotImplementedError
 
@@ -293,6 +305,8 @@ class NumpyMatrixOverRingGeneric(ScipyOrNumpyMatrixOverRingGeneric):
 
     def dot(self, b):
         assert self.ring == b.ring
+
+        b = b.to_numpydense()
 
         if isinstance(b, NumpyVectorOverRingGeneric):
             return NumpyVectorOverRing(numpy.dot(self.A, b.v), self.ring)
@@ -377,6 +391,9 @@ class GenericVector(object):
 
     def __len__(self):
         return len(self.v)
+
+    def to_scipy(self):
+        return self.to_numpydense()
 
 class SageVector(GenericVector):
     def __init__(self, v):
@@ -541,6 +558,7 @@ class MagmaMatrix(GenericMatrix):
 
     def count_nonzero(self):
         return magma.NumberOfNonZeroEntries(self.A)
+
 class MagmaDenseMatrix(MagmaMatrix):
     def __init__(self,A,ring):
         self.A = A
