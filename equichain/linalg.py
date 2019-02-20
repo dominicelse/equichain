@@ -395,6 +395,12 @@ class GenericVector(object):
     def to_scipy(self):
         return self.to_numpydense()
 
+    def to_magma(self):
+        return self.to_magmadense()
+
+    def to_magmadense(self):
+        return self.to_numpydense().to_magmadense()
+
 class SageVector(GenericVector):
     def __init__(self, v):
         self.v = v
@@ -414,6 +420,17 @@ class SageVector(GenericVector):
     def ring(self):
         return self.v.base_ring()
 
+class MagmaVector(GenericVector):
+    def __init__(self, v, ring):
+        self.v = v
+        self.ring = ring
+
+    def to_numpydense(self):
+        return NumpyMatrixOverRing(magmaconv.numpy_vector_from_magma(self.v), self.ring)
+
+    def convert_to_like_self(self):
+        return self.to_magmadense()
+
 class NumpyVectorOverRingGeneric(GenericVector):
     def __init__(self):
         raise NotImplementedError
@@ -423,6 +440,11 @@ class NumpyVectorOverRingGeneric(GenericVector):
 
     def to_numpydense(self):
         return self
+
+    def to_magmadense(self):
+        return MagmaVector(
+                magma_vector_from_numpy(self.v),
+                self.ring)
 
     def convert_to_like_self(self,a):
         return a.to_numpydense()
