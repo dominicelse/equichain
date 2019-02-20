@@ -684,7 +684,12 @@ def lift_cocycle_from_stabilizer_groups(cells, cell_cochain_fns, n,G, twist):
     indexer = ComplexChainIndexer(n=n,G=G,cells=cells)
     constrained_values = numpy.empty(indexer.total_dim(), dtype=int)
 
-    for cell_index,cell in enumerate(cells):
+    orbits = group_orbits(cells, G)
+
+    for orbit in orbits:
+        cell_index = orbit[0]
+        cell = cells[cell_index]
+
         S = get_stabilizer_group(cell, G)
         for gg in itertools.product(*([S]*n)):
             i = indexer([g.toindex() for g in gg], cell_index)
@@ -960,6 +965,29 @@ class SimplexCell(ConvexHullCell):
             (boundary_cell,1) for boundary_cell in boundary_cells
             ))
 
+def group_orbits(cells,  G):
+    cell_indices = set(xrange(len(cells)))
+    
+    orbits = []
+
+    while len(cell_indices) > 0:
+        orbit = set()
+
+        i = iter(cell_indices).next()
+
+        for g in G:
+            j = _get_action_on_cell_index(cells,g,i)
+            orbit.add(j)
+            cell_indices.discard(j)
+
+        orbits.append(list(orbit))
+
+    return orbits
+
+def _get_action_on_cell_index(cells,action,i):
+    acted_cell = cells[i].act_with(action)
+    return cells.index(acted_cell)
+
 class CellComplex(object):
     #@staticmethod
     #def _get_action_matrix(cells,action):
@@ -1004,6 +1032,9 @@ class CellComplex(object):
             for cell in cells_k:
                 yield cell.forget_orientation()
 
+    def get_group_orbits(self, k, G):
+        return group_orbits(self.cells[k], G)
+
     def quotient(self, equiv_relation):
         cplx = CellComplex(self.ndims)
 
@@ -1037,36 +1068,11 @@ class CellComplex(object):
             cplx.add_cell(len(word)-1, OrderedSimplex(word))
         return cplx
 
-    def _get_action_on_cell_index(self,cells,action,i):
-        acted_cell = cells[i].act_with(action)
-        return cells.index(acted_cell)
-
     def get_group_coboundary_matrix(self, n,G,k, twist=None, resolution='cython_bar'):
         return get_group_coboundary_matrix(self.cells[k],n,G, twist=twist, resolution=resolution)
 
     #def get_action_matrix(self, k, action):
     #    return CellComplex._get_action_matrix(self.cells[k], action)
-
-    def get_group_orbits(self, k, G):
-        cells = self.cells[k]
-        cell_indices = set(xrange(len(cells)))
-
-        
-        orbits = []
-
-        while len(cell_indices) > 0:
-            orbit = set()
-
-            i = iter(cell_indices).next()
-
-            for g in G:
-                j = self._get_action_on_cell_index(cells,g,i)
-                orbit.add(j)
-                cell_indices.discard(j)
-
-            orbits.append(list(orbit))
-
-        return orbits
 
     def get_boundary_matrix(self, k):
         cells_km1 = self.cells[k-1]
