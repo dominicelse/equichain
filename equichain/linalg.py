@@ -44,8 +44,8 @@ def kernel_mod_image(d1,d2, return_module_obj=False):
 
     if return_module_obj:
         if d1 is not None:
-            d1,d2 = (x.to_sagedense().A for x in (d1,d2))
-            return d1.right_kernel().quotient(d2.column_module())
+            K = d1.right_kernel_sage()
+            return K.quotient(d2.column_space_sage())
         else:
             d2 = d2.to_sagedense().A
             return (d2.base_ring()**d2.nrows()).quotient(d2.column_module())
@@ -88,6 +88,12 @@ class GenericMatrix(object):
             return self.to_magmadense()
         else:
             return self.to_magmasparse()
+
+    def column_space_sage(self):
+        return self.to_sagedense().column_space_sage()
+
+    def right_kernel_sage(self):
+        return self.right_kernel_matrix().column_space_sage()
 
     def right_kernel_matrix(self):
         if right_kernel_use == 'sage':
@@ -506,6 +512,9 @@ class SageDenseMatrix(GenericMatrix):
 
         #print "right_kernel_matrix: done"
         return ret
+
+    def column_space_sage(self):
+        return self.A.column_module()
 
     def pivots(self):
         return self.A.pivots()
