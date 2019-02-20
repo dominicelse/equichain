@@ -715,9 +715,9 @@ def spinlift(cells, z2_0chain, G):
 def soc_module_map(cplx, G):
     twist = TwistedIntegers.from_orientation_reversing(G)
 
-    soc_E2_page = E2page(cplx,3,0,G,twist,ZZ,'python_bar', return_module_obj=True)
-    soc_E1_page = E1page(cplx,3,0,G,twist,ZZ,'python_bar', return_module_obj=True)
-    nosoc_E2_page = E2page(cplx,0,0,G,twist,GF(2),'python_bar',return_module_obj=True)
+    soc_E2_page = E2page(cplx,3,0,G,twist,ZZ,'cython_bar', return_module_obj=True)
+    soc_E1_page = E1page(cplx,3,0,G,twist,ZZ,'cython_bar', return_module_obj=True)
+    nosoc_E2_page = E2page(cplx,0,0,G,twist,GF(2),'cython_bar',return_module_obj=True)
 
     assert all(inv == 2 for inv in soc_E2_page.invariants())
 
@@ -734,7 +734,6 @@ def soc_module_map(cplx, G):
         blift = spinlift(cplx.cells[0], b, G)
         if not all(x == 0 for x in soc_E1_page.coordinate_vector(blift,reduce=True)):
             print b
-    print "...."
 
 #def solve_matrix_equation(A, b, over_ring=ZZ):
 #    b = vector(over_ring,b)
