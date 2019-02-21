@@ -60,8 +60,6 @@ def numpy_vector_from_magma(A):
         else:
             current_token = strtok(NULL, delims)
 
-        print current_token
-
         if current_token is NULL:
             raise ValueError
 
