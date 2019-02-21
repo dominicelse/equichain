@@ -3,6 +3,7 @@ import equichain.utils as utils
 import itertools
 import functools
 import equichain.linalg as linalg
+import numpy
 from sage.all import *
 
 class FreeModuleSyllable(object):
@@ -104,6 +105,38 @@ class HapResolution(ZGResolution):
             self.cached_dimensions[k] = dim
             return dim
 
+    def convert_cocycle_from_bar_resolution(self, n, cocycle_fn, twist):
+        Ggap = self.G.gap_quotient_grp
+
+        equiv = GapObjWithProperties(gap.BarResolutionEquivalence(self.R.R))
+
+        dim = self.rank(n)
+
+        assert self.R.elts()[1] == gap.One(Ggap)
+
+        cocycle_out = numpy.empty( dim, dtype=int)
+
+        for i in xrange(1, dim+1):
+            word = [[1,i,1]]
+            translation = equiv.psi(n, word)
+            value = 0
+            for word_in_translation in translation:
+                word_in_translation = list(word_in_translation)
+                coeff = int(word_in_translation[0])
+
+                # WARNING: need to fix what toindex() points to (not the parent group!)
+                gap_h = word_in_translation[1]
+                h = self.G.element_from_gap(gap_h)
+
+                coeff *= twist.action_on_Z(h)
+
+                gs = word_in_translation[2:]
+                gs = [ self.G.element_from_gap(g) for g in gs ]
+                value += coeff*cocycle_fn(*gs)
+            cocycle_out[i-1] = value
+
+        return cocycle_out
+
     def _compute_d_matrix_raw(self,k):
         if not (k >= 1 and k <= self.length):
             raise ValueError, "Bad k", k
@@ -134,6 +167,14 @@ class HapResolution(ZGResolution):
                 d[(gi,i-1), (m,)] += coeff
 
         return d.raw_access().coomatrix().tocsr()
+
+class GapObjWithProperties(object):
+    def __init__(self, gapobj):
+        self.gapobj = gapobj
+
+    def __getattr__(self, name):
+        gap_property_accessor = gap("function(o) return o!." + name + "; end")
+        return gap_property_accessor(self.gapobj)
 
 class HapResolutionThinWrapper(object):
     def __init__(self,R):

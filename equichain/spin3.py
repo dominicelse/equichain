@@ -3,6 +3,7 @@ import numpy
 import numpy.linalg
 import scipy.linalg
 import equichain.linalg
+import equichain.utils
 
 from sage.all import *
 from sage.interfaces.gap import GapElement
@@ -63,6 +64,13 @@ def spin_3cocycle(g1,g2,g3):
     assert ret in ZZ
     return Integer(ret)
 
+def spin_3cocycle_for_resolution(R, twist):
+    def compute_bar_cocycle(*gs):
+        assert len(gs) == 3
+        gs = [ g.as_matrix_representative()[0:3,0:3].numpy(dtype=int) for g in gs ]
+        return spin_3cocycle(gs[0],gs[1],gs[2])
+
+    return R.convert_cocycle_from_bar_resolution(3, compute_bar_cocycle, twist)
 
 def preimage_of_O3_element_in_spinhalfrep(A):
     # Returns (U,m) such that the corresponding action on a spin-1/2 is UK^m
