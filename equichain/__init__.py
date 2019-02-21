@@ -1149,11 +1149,8 @@ class CellComplex(object):
 def test_has_solution(fn):
     try:
         fn()
-    except ValueError as e:
-        if e.args[0] == "matrix equation has no solutions":
-            return False
-        else:
-            raise
+    except NoSolutionError:
+        return False
     return True
 
 def Enpage_helper(img,  cplx,n,k,G,twist,ring,resolution, return_module_obj=False):

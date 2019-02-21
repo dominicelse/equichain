@@ -127,7 +127,13 @@ class GenericMatrix(object):
         return self.to_sagedense().elementary_divisors()
 
     #def solve_right(self, v):
-    #    ret = v.convert_to_like_self(self.to_sagedense().solve_right(v.to_sagedense()))
+    #    try:
+    #        ret = v.convert_to_like_self(self.to_sagedense().solve_right(v.to_sagedense()))
+    #    except ValueError as e:
+    #        if e.args[0] == "matrix equation has no solutions":
+    #            raise NoSolutionError
+    #        else:
+    #            raise e
     #    return ret
 
     def solve_right(self, v):
@@ -591,6 +597,9 @@ class MagmaMatrix(GenericMatrix):
     def count_nonzero(self):
         return magma.NumberOfNonZeroEntries(self.A)
 
+class NoSolutionError(Exception):
+    pass
+
 class MagmaDenseMatrix(MagmaMatrix):
     def __init__(self,A,ring):
         self.A = A
@@ -604,7 +613,7 @@ class MagmaDenseMatrix(MagmaMatrix):
         return magma.Ncols(self.A)
 
     def to_numpydense(self):
-        return NumpyMatrixOverRing(magmaconv.numpy_dense_matrix_from_magma(self.A),
+        return NumpyMatrixOverRing(magmaconv.numpy_matrix_from_magma(self.A),
             self.ring)
 
     def to_sagedense(self):
@@ -617,19 +626,25 @@ class MagmaDenseMatrix(MagmaMatrix):
         return obj.to_magmadense()
 
     def solve_right(self, v):
-        v = v.to_magma()
+        v = v.to_magmadense()
 
         if self.ring != v.ring:
             raise TypeError
 
-        if isinstance(v, MagmaMatrix):
-            ret = magma.Transpose(magma.Solution(magma.Transpose(self.A), magma.Transpose(v.v)))
-            return MagmaMatrix(ret, self.ring)
-        elif isinstance(v, MagmaVector):
-            ret = magma.Solution(magma.Transpose(self.A), v.v)
-            return MagmaVector(ret, self.ring)
-        else:
-            assert False
+        try:
+            if isinstance(v, MagmaMatrix):
+                ret = magma.Transpose(magma.Solution(magma.Transpose(self.A), magma.Transpose(v.A)))
+                return MagmaDenseMatrix(ret, self.ring)
+            elif isinstance(v, MagmaVector):
+                ret = magma.Solution(magma.Transpose(self.A), v.v)
+                return MagmaVector(ret, self.ring)
+            else:
+                assert False
+        except TypeError as e:
+            if e[0].find("No solution exists") != -1:
+                raise NoSolutionError
+            else:
+                raise
 
     @property
     def density(self):
