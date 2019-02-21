@@ -204,7 +204,7 @@ class GapAffineQuotientGroup(object):
 
         iso_to_perm = gap.IsomorphismPermGroup(quotient_group)
         self.iso_to_perm_inverse = gap.InverseGeneralMapping(iso_to_perm)
-        self.gap_quotient_grp = gap.Image(iso_to_perm)
+        self._gap_quotient_grp = gap.Image(iso_to_perm)
         self.sage_quotient_grp = PermutationGroup(gap_group = self.gap_quotient_grp)
         self.basegrp = self
         self.scale = scale
@@ -214,6 +214,15 @@ class GapAffineQuotientGroup(object):
         #self.multiplication_table = numpy.array(shape=(len(self.els),len(self.els)), dtype=int)
         #for i in len(self.els):
         #    for j in len(self.els):
+
+    @property
+    def gap_quotient_group(self):
+        if self._gap_quotient_group is None:
+            self._gap_quotient_grp = gap.Group(
+                    [ g.sageperm for g in self.sage_quotient_grp.gens()]
+                )
+
+        return self._gap_quotient_group
 
     def element_from_gap(self, gapg):
         return GapAffineQuotientGroupElement(self.basegrp,
@@ -225,6 +234,7 @@ class GapAffineQuotientGroup(object):
         G.iso_to_perm_inverse = self.iso_to_perm_inverse
         G.homo_to_factor = self.homo_to_factor
         G.basegrp = self.basegrp
+        G._gap_quotient_group = None
         G.scale = self.scale
         #G.basegrp = G
         G._base_init()
