@@ -126,8 +126,12 @@ class GenericMatrix(object):
     def elementary_divisors(self):
         return self.to_sagedense().elementary_divisors()
 
+    #def solve_right(self, v):
+    #    ret = v.convert_to_like_self(self.to_sagedense().solve_right(v.to_sagedense()))
+    #    return ret
+
     def solve_right(self, v):
-        ret = v.convert_to_like_self(self.to_sagedense().solve_right(v.to_sagedense()))
+        ret = v.convert_to_like_self_preserve_density(self.to_magmadense().solve_right(v))
         return ret
 
     def __getitem__(self, i):
@@ -247,6 +251,9 @@ class ScipySparseMatrixOverRingGeneric(ScipyOrNumpyMatrixOverRingGeneric):
         return MagmaSparseMatrix(magmaconv.magma_sparse_matrix_from_scipy(self.A,
             self.ring),
             self.ring)
+
+    def to_magmadense(self):
+        return self.to_magmasparse().to_magmadense()
 
     def convert_to_like_self(self,a):
         return a.to_scipysparse()
@@ -401,6 +408,9 @@ class GenericVector(object):
     def to_magmadense(self):
         return self.to_numpydense().to_magmadense()
 
+    def convert_to_like_self_preserve_density(self,x):
+        return self.convert_to_like_self(x)
+
 class SageVector(GenericVector):
     def __init__(self, v):
         self.v = v
@@ -426,7 +436,7 @@ class MagmaVector(GenericVector):
         self.ring = ring
 
     def to_numpydense(self):
-        return NumpyMatrixOverRing(magmaconv.numpy_vector_from_magma(self.v), self.ring)
+        return NumpyVectorOverRing(magmaconv.numpy_vector_from_magma(self.v), self.ring)
 
     def convert_to_like_self(self):
         return self.to_magmadense()
@@ -443,7 +453,7 @@ class NumpyVectorOverRingGeneric(GenericVector):
 
     def to_magmadense(self):
         return MagmaVector(
-                magma_vector_from_numpy(self.v),
+                magmaconv.magma_vector_from_numpy(self.v, self.ring),
                 self.ring)
 
     def convert_to_like_self(self,a):
@@ -530,8 +540,8 @@ class SageDenseMatrix(GenericMatrix):
     def ring(self):
         return self.A.base_ring()
 
-    def solve_right(self, b):
-        return b._constructor(self.backend_obj.solve_right(b.backend_obj).change_ring(b.ring))
+    #def solve_right(self, b):
+    #    return b._constructor(self.backend_obj.solve_right(b.backend_obj).change_ring(b.ring))
 
     @property
     def density(self):
@@ -605,6 +615,21 @@ class MagmaDenseMatrix(MagmaMatrix):
 
     def convert_to_like_self(self,obj):
         return obj.to_magmadense()
+
+    def solve_right(self, v):
+        v = v.to_magma()
+
+        if self.ring != v.ring:
+            raise TypeError
+
+        if isinstance(v, MagmaMatrix):
+            ret = magma.Transpose(magma.Solution(magma.Transpose(self.A), magma.Transpose(v.v)))
+            return MagmaMatrix(ret, self.ring)
+        elif isinstance(v, MagmaVector):
+            ret = magma.Solution(magma.Transpose(self.A), v.v)
+            return MagmaVector(ret, self.ring)
+        else:
+            assert False
 
     @property
     def density(self):
