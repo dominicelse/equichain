@@ -733,7 +733,7 @@ def soc_module_map(cplx, G):
         b = nosoc_E2_page.lift(v)
         blift = spinlift(cplx.cells[0], b, G)
         if not all(x == 0 for x in soc_E1_page.coordinate_vector(blift,reduce=True)):
-            print b
+            print "Something:", list(b)
 
 #def solve_matrix_equation(A, b, over_ring=ZZ):
 #    b = vector(over_ring,b)
