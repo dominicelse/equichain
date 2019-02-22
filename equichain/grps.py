@@ -357,10 +357,9 @@ class TwistedIntegers(object):
         return self.factors[self.G.element_to_index(g)]
 
 class GapAffineQuotientGroupElement(MatrixQuotientGroupElement):
-    def __init__(self, G, sageperm, index=None):
+    def __init__(self, G, sageperm):
         self.G = G
         self.sageperm = sageperm
-        self._index = index
 
     def __mul__(a, b):
         assert a.G is b.G
@@ -382,10 +381,11 @@ class GapAffineQuotientGroupElement(MatrixQuotientGroupElement):
         return self.G.coset_representative_numpy_int(self)
 
     def toindex(self):
-        if self._index is None:
-            return self.G.basegrp.element_to_index(self)
-        else:
-            return self._index
+        return self.G.element_to_index(self)
+        #if self._index is None:
+        #    return self.G.element_to_index(self)
+        #else:
+        #    return self._index
 
 class FiniteAbelianGroup(object):    
     def __init__(self, n):
