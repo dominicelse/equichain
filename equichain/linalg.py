@@ -521,6 +521,23 @@ def solve_matrix_equation_with_constraint(A, subs_indices, xconstr):
     assert(A.dot(sol_full).count_nonzero() == 0)
     return sol_full
 
+def solve_simultaneous_matrix_equation(A, a, B, b):
+    """ Solves the simultaneous equations Ax = a, Bx = b. """
+
+    assert A.ncols() == B.ncols()
+    n = A.ncols()
+
+    if a is None:
+        a = A.factory().zero_vector(A.nrows())
+
+    if b is None:
+        b = A.factory().zero_vector(B.nrows())
+
+    stack = A.factory().bmat([[A],[B]])
+    ab = A.factory().concatenate_vectors(a,b)
+
+    return stack.solve_right(ab)
+
 from sage.matrix.matrix_dense import Matrix_dense
 class SageDenseMatrix(GenericMatrix):
     def __init__(self,A):

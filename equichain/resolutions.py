@@ -95,6 +95,35 @@ class HapResolution(ZGResolution):
         self.length = self.R.length()
         self.cached_dimensions = {}
 
+    def rawgap(self):
+        return self.R.R
+
+    def cocycle_map(self, n, R, gaphomo, twist):
+        A = numpy.zeros( (self.rank(n),R.rank(n)),  dtype=int)
+
+        gapchainmap = GapObjWithProperties(gap.EquivariantChainMap(self.R.R, R.R.R, gaphomo))
+
+        for basis_el in xrange(1,self.rank(n)+1):
+            word = [[basis_el,1]]
+            mappedword = gapchainmap.mapping(word, n)
+
+            for syllable in mappedword:
+                i = basis_el-1
+                mapped_basis_el = int(syllable[1])
+                if mapped_basis_el < 0:
+                    mapped_basis_el = -mapped_basis_el
+                    coeff = -1
+                else:
+                    coeff = 1
+
+                j = int(syllable[1])-1
+                h = R.G.element_from_gap(R.R.elts()[syllable[2]])
+                coeff *= twist.action_on_Z(h)
+
+                A[i,j] += coeff
+
+        return A
+
     def rank(self,k):
         if not (k >= 0 and k <= self.length):
             raise IndexError, k

@@ -2,6 +2,7 @@ from __future__ import division
 import itertools
 import functools
 import numpy
+import scipy.linalg
 import sys
 #import cProfile
 #import time
@@ -677,7 +678,7 @@ def get_stabilizer_group(cell,G):
     except AttributeError:
         return gs
 
-def lift_cocycle_from_stabilizer_groups(cells, cell_cochain_fns, n,G, twist):
+def lift_bar_cocycle_from_stabilizer_groups(cells, cell_cochain_fns, n,G, twist):
     delta = cython_fns.get_group_coboundary_matrix(cells, n, G, twist)
 
     constrained_indices = []
@@ -701,16 +702,59 @@ def lift_cocycle_from_stabilizer_groups(cells, cell_cochain_fns, n,G, twist):
     ret = solve_matrix_equation_with_constraint(delta, constrained_indices, constrained_values)
     return ret.to_sagedense().v
 
-def spinlift(cells, z2_0chain, G):
+def lift_cocycle_from_orbits(G, n, RG, cells, cocycle_fn, twist):
+    orbits = group_orbits(cells, G)
+    ring = ZZ
+
+    Athiscell = [None]*len(orbits)
+    cocyclethiscell = [None]*len(orbits)
+
+    for i,orbit in enumerate(orbits):
+        cell_index = orbit[0]
+        cell = cells[cell_index]
+
+        S = get_stabilizer_group(cell, G)
+        Sgap = S.gap_quotient_grp
+        RSgap = gap.ResolutionFiniteSubgroup(RG.rawgap(), Sgap)
+        RS = resolutions.HapResolution(RSgap, S)
+        Ggap = G.gap_quotient_grp
+        Sgens = gap.GeneratorsOfGroup(Sgap)
+        gaphomo = gap.GroupHomomorphismByImages(Sgap, Ggap, Sgens, Sgens)
+
+        Athiscell[i] = RS.cocycle_map(n,RG, gaphomo, twist)
+        cocyclethiscell[i] = cocycle_fn(cell_index, S, RS)
+
+    A = scipy.linalg.block_diag(*Athiscell)
+    cocycle = numpy.concatenate(tuple(cocyclethiscell))
+
+    A = NumpyMatrixOverZ(A)
+    cocycle = NumpyVectorOverZ(cocycle)
+    delta = get_group_coboundary_matrix(cells, n,G, twist, resolution=RG)
+
+    return solve_simultaneous_matrix_equation(delta, None, A, cocycle)
+
+#def spinlift_bar(cells, z2_0chain, G):
+#    n=3
+#
+#    def cell_cochain_fns(cell_index, g1,g2,g3):
+#        asm1,asm2,asm3 = (g.as_matrix_representative()[0:3,0:3].numpy() for g in (g1,g2,g3))
+#        return int((int(z2_0chain[cell_index]) % 2) * spin3.spin_3cocycle(asm1,asm2,asm3))
+#
+#    twist = TwistedIntegers.from_orientation_reversing(G)
+#
+#    return lift_cocycle_from_orbits(G, n, RG, cells, cocycle_fn, twist)
+
+def spinlift(cells, z2_0chain, G, RG):
     n=3
 
-    def cell_cochain_fns(cell_index, g1,g2,g3):
-        asm1,asm2,asm3 = (g.as_matrix_representative()[0:3,0:3].numpy() for g in (g1,g2,g3))
-        return int((int(z2_0chain[cell_index]) % 2) * spin3.spin_3cocycle(asm1,asm2,asm3))
+    def cocycle_fn(cell_index, S, RS):
+        if int(z2_0chain[cell_index]) % 2 == 1:
+            return spin3.spin_3cocycle_for_resolution(RS,twist)
+        else:
+            return numpy.zeros(RS.rank(n),dtype=int)
 
     twist = TwistedIntegers.from_orientation_reversing(G)
-
-    return lift_cocycle_from_stabilizer_groups(cells, cell_cochain_fns,n,G,twist)
+    return lift_cocycle_from_orbits(G, n, RG, cells, cocycle_fn,twist)
 
 def soc_module_map(cplx, G):
     twist = TwistedIntegers.from_orientation_reversing(G)
