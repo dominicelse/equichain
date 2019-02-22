@@ -777,6 +777,7 @@ def soc_module_map(cplx, G, RG):
     for v in k.basis():
         b = nosoc_E2_page.lift(v)
         blift = spinlift(cplx.cells[0], b, G, RG)
+        blift = blift.to_sagedense().v
         if not all(x == 0 for x in soc_E1_page.coordinate_vector(blift,reduce=True)):
             print "Something:", list(b)
 
