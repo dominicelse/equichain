@@ -769,6 +769,7 @@ def soc_module_map(cplx, G, RG):
 
     for i,b in enumerate(nosoc_E2_page.basis()):
         blift = spinlift(cplx.cells[0], nosoc_E2_page.lift(b), G, RG)
+        blift = blift.to_sagedense().v
         blift_coords = soc_E2_page.coordinate_vector(blift, reduce=True)
         A[:,i] = blift_coords
 
