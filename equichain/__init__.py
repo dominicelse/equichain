@@ -756,26 +756,26 @@ def spinlift(cells, z2_0chain, G, RG):
     twist = TwistedIntegers.from_orientation_reversing(G)
     return lift_cocycle_from_orbits(G, n, RG, cells, cocycle_fn,twist)
 
-def soc_module_map(cplx, G):
+def soc_module_map(cplx, G, RG):
     twist = TwistedIntegers.from_orientation_reversing(G)
 
-    soc_E2_page = E2page(cplx,3,0,G,twist,ZZ,'cython_bar', return_module_obj=True)
-    soc_E1_page = E1page(cplx,3,0,G,twist,ZZ,'cython_bar', return_module_obj=True)
-    nosoc_E2_page = E2page(cplx,0,0,G,twist,GF(2),'cython_bar',return_module_obj=True)
+    soc_E2_page = E2page(cplx,3,0,G,twist,ZZ,RG, return_module_obj=True)
+    soc_E1_page = E1page(cplx,3,0,G,twist,ZZ,RG, return_module_obj=True)
+    nosoc_E2_page = E2page(cplx,0,0,G,twist,GF(2),RG,return_module_obj=True)
 
     assert all(inv == 2 for inv in soc_E2_page.invariants())
 
     A = matrix( GF(2),  len(soc_E2_page.invariants()), nosoc_E2_page.dimension() )
 
     for i,b in enumerate(nosoc_E2_page.basis()):
-        blift = spinlift(cplx.cells[0], nosoc_E2_page.lift(b), G)
+        blift = spinlift(cplx.cells[0], nosoc_E2_page.lift(b), G, RG)
         blift_coords = soc_E2_page.coordinate_vector(blift, reduce=True)
         A[:,i] = blift_coords
 
     k = A.right_kernel()
     for v in k.basis():
         b = nosoc_E2_page.lift(v)
-        blift = spinlift(cplx.cells[0], b, G)
+        blift = spinlift(cplx.cells[0], b, G, RG)
         if not all(x == 0 for x in soc_E1_page.coordinate_vector(blift,reduce=True)):
             print "Something:", list(b)
 
