@@ -723,7 +723,7 @@ def lift_cocycle_from_orbits(G, n, RG, cells, cocycle_fn, twist):
             continue
 
         Sgap = S.gap_quotient_grp
-        RSgap = gap.ResolutionFiniteSubgroup(RG.rawgap(), Sgap)
+        RSgap = gap.ResolutionFiniteGroup(Sgap, n)
         RS = resolutions.HapResolution(RSgap, S)
         Ggap = G.gap_quotient_grp
         Sgens = gap.GeneratorsOfGroup(Sgap)
