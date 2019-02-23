@@ -714,6 +714,14 @@ def lift_cocycle_from_orbits(G, n, RG, cells, cocycle_fn, twist):
         cell = cells[cell_index]
 
         S = get_stabilizer_group(cell, G)
+
+        # HAP chokes on trivial groups,
+        # so we do this case separately. 
+        if S.size() == 1:                
+            Athiscell[i] = numpy.empty( (0, RG.rank(n)*len(cells) ) , dtype=int)
+            cocyclethiscell[i] = numpy.empty( 0, dtype=int )
+            continue
+
         Sgap = S.gap_quotient_grp
         RSgap = gap.ResolutionFiniteSubgroup(RG.rawgap(), Sgap)
         RS = resolutions.HapResolution(RSgap, S)
@@ -722,9 +730,14 @@ def lift_cocycle_from_orbits(G, n, RG, cells, cocycle_fn, twist):
         gaphomo = gap.GroupHomomorphismByImages(Sgap, Ggap, Sgens, Sgens)
 
         Athiscell[i] = RS.cocycle_map(n,RG, gaphomo, twist)
+        Athiscell[i] = numpy.concatenate((
+            numpy.zeros( (RS.rank(n), cell_index*RG.rank(n)), dtype=int ),
+            Athiscell[i],
+            numpy.zeros( (RS.rank(n), (len(cells)-cell_index-1)*RG.rank(n)), dtype =int)
+           ), axis=1)
         cocyclethiscell[i] = cocycle_fn(cell_index, S, RS)
 
-    A = scipy.linalg.block_diag(*Athiscell)
+    A = numpy.concatenate(tuple(Athiscell), axis=0)
     cocycle = numpy.concatenate(tuple(cocyclethiscell))
 
     A = NumpyMatrixOverZ(A)
