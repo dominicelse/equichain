@@ -153,7 +153,6 @@ class HapResolution(ZGResolution):
                 word_in_translation = list(word_in_translation)
                 coeff = int(word_in_translation[0])
 
-                # WARNING: need to fix what toindex() points to (not the parent group!)
                 gap_h = word_in_translation[1]
                 h = self.G.element_from_gap(gap_h)
 
