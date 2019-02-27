@@ -116,7 +116,7 @@ class HapResolution(ZGResolution):
                 else:
                     coeff = 1
 
-                j = int(syllable[1])-1
+                j = mapped_basis_el-1
                 h = R.G.element_from_gap(R.R.elts()[syllable[2]])
                 coeff *= twist.action_on_Z(h)
 
