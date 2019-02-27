@@ -134,6 +134,36 @@ class HapResolution(ZGResolution):
             self.cached_dimensions[k] = dim
             return dim
 
+    def cocycle_from_bar_resolution_mapmatrix(self, n, twist):
+        Ggap = self.G.gap_quotient_grp
+
+        equiv = GapObjWithProperties(gap.BarResolutionEquivalence(self.R.R))
+
+        dim = self.rank(n)
+        A = utils.COOMatrixHelper((dim, self.G.size()**n), dtype=int)
+        indexer_in = utils.MultiIndexer(*[self.G.size()]*n)
+
+        assert self.R.elts()[1] == gap.One(Ggap)
+
+        for i in xrange(1, dim+1):
+            word = [[1,i,1]]
+            translation = equiv.psi(n, word)
+            value = 0
+            for word_in_translation in translation:
+                word_in_translation = list(word_in_translation)
+                coeff = int(word_in_translation[0])
+
+                gap_h = word_in_translation[1]
+                h = self.G.element_from_gap(gap_h)
+
+                coeff *= twist.action_on_Z(h)
+
+                gs = word_in_translation[2:]
+                gs = [ self.G.element_from_gap(g).toindex() for g in gs ]
+                A[i-1, indexer_in(*gs)] += coeff
+
+        return A.coomatrix().tocsc()
+
     def convert_cocycle_from_bar_resolution(self, n, cocycle_fn, twist):
         Ggap = self.G.gap_quotient_grp
 
