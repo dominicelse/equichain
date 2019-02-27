@@ -1,6 +1,7 @@
 #cython: boundscheck=False,profile=True
 import equichain
 import numpy
+import sys
 from scipy import sparse
 cimport numpy as np
 cimport cython
@@ -249,9 +250,12 @@ def get_group_coboundary_matrix(cells, int n, G, twist):
     coo_i = numpy.zeros(coo_nentries, dtype=int)
     coo_j = numpy.zeros(coo_nentries, dtype=int)
 
+    times_tables = numpy.empty( (size_of_group,size_of_group), dtype=int)
+
     cdef np.int_t [:] coo_i_view = coo_i
     cdef np.int_t [:] coo_j_view = coo_j
     cdef np.int_t [:] coo_entries_view = coo_entries
+    cdef np.int_t [:,:] times_tables_view = times_tables
 
     cdef int coo_entry_index = 0
 
@@ -261,6 +265,12 @@ def get_group_coboundary_matrix(cells, int n, G, twist):
     cdef int acted_ci,parity
 
     cdef bint incremented
+
+    for gi1 in xrange(size_of_group):
+        for gi2 in xrange(size_of_group):
+            times_tables[gi1, gi2] = (G.element_by_index(gi1)*G.element_by_index(gi2)).toindex()
+
+    #print >>sys.stderr, "Finished precomputing times tables."
 
     ## BEGIN NATIVE BLOCK
     for ci in xrange(ncells):
@@ -294,9 +304,9 @@ def get_group_coboundary_matrix(cells, int n, G, twist):
                 for ii in xrange(i+1,n+1):
                     temp_gi[ii-1] = gi[ii]
 
-                ## BEGIN NON-NATIVE SUBBLOCK
-                temp_gi[i-1] = (g[i-1]*g[i]).toindex()
-                ## END NON-NATIVE SUBBLOCK
+                temp_gi[i-1] = times_tables_view[gi[i-1],gi[i]]
+                othervalue = (g[i-1]*g[i]).toindex()
+                assert othervalue == temp_gi[i-1]
 
                 coo_entries_view[coo_entry_index] = (-1)**i
                 coo_i_view[coo_entry_index] = build_index_out(n,ncells,size_of_group,ci,&gi[0])
