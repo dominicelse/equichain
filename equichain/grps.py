@@ -384,7 +384,7 @@ class TwistedIntegers(object):
         return self.G
 
     def action_on_Z(self, g):
-        return self.factors[self.G.element_to_index(g)]
+        return self.factors[g.toindex_parent()]
 
 class GapAffineQuotientGroupElement(MatrixQuotientGroupElement):
     def __init__(self, G, sageperm):
@@ -422,6 +422,9 @@ class GapAffineQuotientGroupElement(MatrixQuotientGroupElement):
         #    return self.G.element_to_index(self)
         #else:
         #    return self._index
+
+    def toindex_parent(self):
+        return self.G.parent.element_to_index(self)
 
 class FiniteAbelianGroup(object):    
     def __init__(self, n):
