@@ -56,7 +56,7 @@ def spin_cocycle(g1,g2, additive=False):
 def spin_3cocycle(g1,g2,g3):
     g1,g2,g3 = (convert_to_numpy(g) for g in (g1,g2,g3)) 
 
-    p1 = int(numpy.linalg.det(g1))
+    p1 = int(numpy.around(numpy.linalg.det(g1)))
 
     w = lambda a,b: spin_cocycle(a,b,additive=True)
 
@@ -67,8 +67,8 @@ def spin_3cocycle(g1,g2,g3):
 def spin_3cocycle_for_resolution(R, twist):
     def compute_bar_cocycle(*gs):
         assert len(gs) == 3
-        gs = [ g.as_matrix_representative()[0:3,0:3].numpy(dtype=int) for g in gs ]
-        return spin_3cocycle(gs[0],gs[1],gs[2])
+        gsmatrix = [ g.orthogonal_point_group_element() for g in gs ]
+        return spin_3cocycle(gsmatrix[0],gsmatrix[1],gsmatrix[2])
 
     return R.convert_cocycle_from_bar_resolution(3, compute_bar_cocycle, twist)
 

@@ -1,6 +1,8 @@
 from equichain.utils import *
 from equichain.sageutils import *
+from equichain import wigner_seitz
 from sage.all import *
+import scipy.linalg
 import itertools
 import numpy.matlib
 import string
@@ -190,11 +192,12 @@ class GapAffineQuotientGroup(object):
             self.els_reverse_lookup[self.els[i]] = i
 
         self.stored_coset_representatives_numpy_int = None
+        self.stored_coset_representatives_numpy = None
 
     def identity(self):
         return GapAffineQuotientGroupElement(self, self.sage_quotient_grp.identity())
 
-    def __init__(self, G, N=None, scale=1):
+    def __init__(self, G, N=None, scale=1, d=3):
         if N is None:
             quotient_group = gap.PointGroup(G)
             self.homo_to_factor = gap.PointHomomorphism(G)
@@ -202,12 +205,18 @@ class GapAffineQuotientGroup(object):
             self.homo_to_factor = gap.NaturalHomomorphismByNormalSubgroup(G,N)
             quotient_group = gap.ImagesSource(self.homo_to_factor)
 
+        self.d = d
+
         iso_to_perm = gap.IsomorphismPermGroup(quotient_group)
         self.iso_to_perm_inverse = gap.InverseGeneralMapping(iso_to_perm)
         self._gap_quotient_grp = gap.Image(iso_to_perm)
         self.sage_quotient_grp = PermutationGroup(gap_group = self._gap_quotient_grp)
         self.basegrp = self
         self.scale = scale
+
+        Q = wigner_seitz.space_group_orthogonality_matrix(d,G).numpy(dtype=float)
+        A = scipy.linalg.sqrtm(Q)
+        self.orthogonalizing_basis_change = A
 
         self._base_init()
 
@@ -236,6 +245,8 @@ class GapAffineQuotientGroup(object):
         G.basegrp = self.basegrp
         G._gap_quotient_grp = None
         G.scale = self.scale
+        G.orthogonalizing_basis_change = self.orthogonalizing_basis_change
+        G.d = self.d
         #G.basegrp = G
         G._base_init()
         return G
@@ -276,6 +287,25 @@ class GapAffineQuotientGroup(object):
         if self.stored_coset_representatives_numpy_int is None:
             self._compute_coset_representatives_numpy_int()
         return self.stored_coset_representatives_numpy_int[g.sageperm]
+
+    def _compute_coset_representatives_numpy(self):
+        self.stored_coset_representatives_numpy = dict(
+                (g, A.numpy(dtype=float))
+                for g,A in self.stored_coset_representatives.iteritems()
+                )
+
+    def coset_representative_numpy(self,g):
+        if self.stored_coset_representatives_numpy is None:
+            self._compute_coset_representatives_numpy()
+        return self.stored_coset_representatives_numpy[g.sageperm]
+
+    def orthogonal_point_group_element(self,g):
+        if self.scale != 1:
+            raise NotImplementedError
+
+        A = self.orthogonalizing_basis_change
+        O = g.as_matrix_representative_numpy()[0:self.d,0:self.d]
+        return numpy.dot(numpy.dot(A, O), scipy.linalg.inv(A))
 
     def __len__(self):
         return self.size()
@@ -376,6 +406,12 @@ class GapAffineQuotientGroupElement(MatrixQuotientGroupElement):
 
     def as_matrix_representative(self):
         return self.G.coset_representative(self)
+
+    def as_matrix_representative_numpy(self):
+        return self.G.coset_representative_numpy(self)
+
+    def orthogonal_point_group_element(self):
+        return self.G.orthogonal_point_group_element(self)
 
     def as_matrix_representative_numpy_int(self):
         return self.G.coset_representative_numpy_int(self)
