@@ -76,7 +76,7 @@ class BarResolution(ZGResolution):
             for i in xrange(1,n):
                 a = (
                       gi[0:(i-1)] + 
-                      ((g[i-1]*g[i]).toindex(),) + 
+                      (self.G.element_to_index(g[i-1]*g[i]),) + 
                       gi[(i+1):]
                     )
                 d[ (0,) + a, gi ] += (-1)**i
@@ -159,7 +159,7 @@ class HapResolution(ZGResolution):
                 coeff *= twist.action_on_Z(h)
 
                 gs = word_in_translation[2:]
-                gs = [ self.G.element_from_gap(g).toindex() for g in gs ]
+                gs = [ self.G.element_to_index(self.G.element_from_gap(g)) for g in gs ]
                 A[i-1, indexer_in(*gs)] += coeff
 
         return A.coomatrix().tocsc()
@@ -204,10 +204,9 @@ class HapResolution(ZGResolution):
                 in_indexer = utils.MultiIndexer(self.rank(k))
                 )
 
-        # precompute the map from "hap index" to the index corresponding to
-        # taking g.toindex()
+        # precompute the map from "hap index" to the index coming from G.element_to_index
         elts = self.R.elts()
-        index_map = [ self.G.element_from_gap(g).toindex() for g in elts ]
+        index_map = [ self.G.element_to_index(self.G.element_from_gap(g)) for g in elts ]
 
         for m in xrange(d.in_indexer.total_dim()):
             acted_m = self.R.boundary(k, m+1)

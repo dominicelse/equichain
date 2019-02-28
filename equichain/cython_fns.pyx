@@ -268,7 +268,7 @@ def get_group_coboundary_matrix(cells, int n, G, twist):
 
     for gi1 in xrange(size_of_group):
         for gi2 in xrange(size_of_group):
-            times_tables[gi1, gi2] = (G.element_by_index(gi1)*G.element_by_index(gi2)).toindex()
+            times_tables[gi1, gi2] = G.element_to_index(G.element_by_index(gi1)*G.element_by_index(gi2))
 
     #print >>sys.stderr, "Finished precomputing times tables."
 
@@ -305,8 +305,8 @@ def get_group_coboundary_matrix(cells, int n, G, twist):
                     temp_gi[ii-1] = gi[ii]
 
                 temp_gi[i-1] = times_tables_view[gi[i-1],gi[i]]
-                othervalue = (g[i-1]*g[i]).toindex()
-                assert othervalue == temp_gi[i-1]
+                #othervalue = G.element_to_index(g[i-1]*g[i])
+                #assert othervalue == temp_gi[i-1]
 
                 coo_entries_view[coo_entry_index] = (-1)**i
                 coo_i_view[coo_entry_index] = build_index_out(n,ncells,size_of_group,ci,&gi[0])

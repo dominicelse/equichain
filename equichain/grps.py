@@ -91,6 +91,7 @@ class MagneticTorusTranslationGroupElement(MatrixQuotientGroupElement):
         raise NotImplementedError
 
     def toindex(self):
+        raise NotImplementedError
         return self.G.element_to_index(self)
 
 class MagneticTorusTranslationGroup(object):
@@ -384,7 +385,7 @@ class TwistedIntegers(object):
         return self.G
 
     def action_on_Z(self, g):
-        return self.factors[g.toindex_basegrp()]
+        return self.factors[self.G.element_to_index(g)]
 
 class GapAffineQuotientGroupElement(MatrixQuotientGroupElement):
     def __init__(self, G, sageperm):
@@ -417,6 +418,7 @@ class GapAffineQuotientGroupElement(MatrixQuotientGroupElement):
         return self.G.coset_representative_numpy_int(self)
 
     def toindex(self):
+        raise NotImplementedError
         return self.G.element_to_index(self)
         #if self._index is None:
         #    return self.G.element_to_index(self)
@@ -424,6 +426,7 @@ class GapAffineQuotientGroupElement(MatrixQuotientGroupElement):
         #    return self._index
 
     def toindex_basegrp(self):
+        raise NotImplementedError
         return self.G.basegrp.element_to_index(self)
 
 class FiniteAbelianGroup(object):    

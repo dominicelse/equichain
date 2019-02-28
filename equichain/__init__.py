@@ -693,7 +693,7 @@ def lift_bar_cocycle_from_stabilizer_groups(cells, cell_cochain_fns, n,G, twist)
 
         S = get_stabilizer_group(cell, G)
         for gg in itertools.product(*([S]*n)):
-            i = indexer([g.toindex() for g in gg], cell_index)
+            i = indexer([G.element_to_index(g) for g in gg], cell_index)
             constrained_indices += [ i ]
             constrained_values[i] = cell_cochain_fns(cell_index, *gg)
 
@@ -907,7 +907,7 @@ def get_group_coboundary_matrix(cells, n,G, twist, resolution='cython_bar'):
             for i in xrange(1,n+1):
                 a = (
                       gi[0:(i-1)] + 
-                      ((g[i-1]*g[i]).toindex(),) + 
+                      (G.element_to_index(g[i-1]*g[i]),) + 
                       gi[(i+1):]
                     )
                 A[build_index(ci, gi, ci, a)] += (-1)**i
