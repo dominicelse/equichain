@@ -725,16 +725,8 @@ def lift_cocycle_from_orbits(G, n, RG, cells, cocycle_fn, twist):
         Sgap = S.gap_quotient_grp
         RSgap = gap.ResolutionFiniteGroup(Sgap, n)
         RS = resolutions.HapResolution(RSgap, S)
-        Ggap = G.gap_quotient_grp
-        Sgens = gap.GeneratorsOfGroup(Sgap)
-        gaphomo = gap.GroupHomomorphismByImages(Sgap, Ggap, Sgens, Sgens)
 
-        Athiscell[i] = RS.cocycle_map(n,RG, gaphomo, twist)
-        Athiscell[i] = numpy.concatenate((
-            numpy.zeros( (RS.rank(n), cell_index*RG.rank(n)), dtype=int ),
-            Athiscell[i],
-            numpy.zeros( (RS.rank(n), (len(cells)-cell_index-1)*RG.rank(n)), dtype =int)
-           ), axis=1)
+        Athiscell[i] = RS.cocycle_restriction_matrixmap(n,RG, cells, twist, self_is_stabilizer_of_cell=cell_index)
         cocyclethiscell[i] = cocycle_fn(cell_index, S, RS)
 
     A = numpy.concatenate(tuple(Athiscell), axis=0)

@@ -3,6 +3,7 @@ import equichain.utils as utils
 import itertools
 import functools
 import equichain.linalg as linalg
+import equichain
 import numpy
 from sage.all import *
 
@@ -98,9 +99,25 @@ class HapResolution(ZGResolution):
     def rawgap(self):
         return self.R.R
 
-    def cocycle_map(self, n, R, gaphomo, twist):
-        A = numpy.zeros( (self.rank(n),R.rank(n)),  dtype=int)
+    def cocycle_restriction_matrixmap(self, n, R, cells, twist, self_is_stabilizer_of_cell=None):
+        mapped_cell_indices, mapping_parities = equichain.get_group_action_on_cells(cells, R.G,
+                twist=twist,inverse=True)
 
+        if self_is_stabilizer_of_cell is not None:
+            ncells_out = 1
+        else:
+            ncells_out = len(cells)
+        indexer_out = utils.MultiIndexer(ncells_out, self.rank(n))
+        indexer_in = utils.MultiIndexer(len(cells), R.rank(n))
+        A = numpy.zeros( (indexer_out.total_dim(), indexer_in.total_dim()), dtype=int )
+
+        G = R.G
+        S = self.G
+        Ggap = G.gap_quotient_grp
+        Sgap = S.gap_quotient_grp
+        Sgens = gap.GeneratorsOfGroup(Sgap)
+
+        gaphomo = gap.GroupHomomorphismByImages(Sgap, Ggap, Sgens, Sgens)
         gapchainmap = GapObjWithProperties(gap.EquivariantChainMap(self.R.R, R.R.R, gaphomo))
 
         for basis_el in xrange(1,self.rank(n)+1):
@@ -117,10 +134,17 @@ class HapResolution(ZGResolution):
                     coeff = 1
 
                 j = mapped_basis_el-1
-                h = R.G.element_from_gap(R.R.elts()[syllable[2]])
-                coeff *= twist.action_on_Z(h)
+                h = G.element_from_gap(R.R.elts()[syllable[2]])
+                hi = G.element_to_index(h)
 
-                A[i,j] += coeff
+                if self_is_stabilizer_of_cell is None:
+                    cell_range = xrange(ncells_out)
+                else:
+                    cell_range = [ self_is_stabilizer_of_cell ]
+
+                for cell_index in cell_range:
+                    A[indexer_out(cell_index if self_is_stabilizer_of_cell is None else 0, i), 
+                      indexer_in(mapped_cell_indices[hi,cell_index], j)] += coeff*mapping_parities[hi,cell_index]
 
         return A
 
