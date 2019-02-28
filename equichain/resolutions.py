@@ -107,8 +107,8 @@ class HapResolution(ZGResolution):
             ncells_out = 1
         else:
             ncells_out = len(cells)
-        indexer_out = utils.MultiIndexer(ncells_out, self.rank(n))
-        indexer_in = utils.MultiIndexer(len(cells), R.rank(n))
+        indexer_out = utils.MultiIndexer(self.rank(n), ncells_out)
+        indexer_in = utils.MultiIndexer(R.rank(n), len(cells))
         A = numpy.zeros( (indexer_out.total_dim(), indexer_in.total_dim()), dtype=int )
 
         G = R.G
@@ -143,8 +143,8 @@ class HapResolution(ZGResolution):
                     cell_range = [ self_is_stabilizer_of_cell ]
 
                 for cell_index in cell_range:
-                    A[indexer_out(cell_index if self_is_stabilizer_of_cell is None else 0, i), 
-                      indexer_in(mapped_cell_indices[hi,cell_index], j)] += coeff*mapping_parities[hi,cell_index]
+                    A[indexer_out(i, cell_index if self_is_stabilizer_of_cell is None else 0), 
+                      indexer_in(j, mapped_cell_indices[hi,cell_index])] += coeff*mapping_parities[hi,cell_index]
 
         return A
 
