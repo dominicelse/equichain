@@ -706,37 +706,37 @@ def lift_cocycle_from_orbits(G, n, RG, cells, cocycle_fn, twist):
     orbits = group_orbits(cells, G)
     ring = ZZ
 
-    Athiscell = [None]*len(orbits)
-    cocyclethiscell = [None]*len(orbits)
+    cocycleG_indexer = utils.MultiIndexer(RG.rank(n), len(cells))
+    cocycleG = numpy.ones( cocycleG_indexer.total_dim() ) * 999
 
     for i,orbit in enumerate(orbits):
-        cell_index = orbit[0]
-        cell = cells[cell_index]
+        cells_in_orbit = cells.subset_by_indices(orbit)
+        cell = cells_in_orbit[0]
 
         S = get_stabilizer_group(cell, G)
 
-        # HAP chokes on trivial groups,
-        # so we do this case separately. 
         if S.size() == 1:                
-            Athiscell[i] = numpy.empty( (0, RG.rank(n)*len(cells) ) , dtype=int)
-            cocyclethiscell[i] = numpy.empty( 0, dtype=int )
-            continue
+            # HAP chokes on trivial groups,
+            # so we do this case separately. 
+            restr = NumpyMatrixOverZ(numpy.empty( (0, RG.rank(n)*len(orbit) ) , dtype=int))
+            cocycleS = NumpyVectorOverZ(numpy.empty(0, dtype=int))
+        else:
+            Sgap = S.gap_quotient_grp
+            RSgap = gap.ResolutionFiniteGroup(Sgap, n)
+            RS = resolutions.HapResolution(RSgap, S)
 
-        Sgap = S.gap_quotient_grp
-        RSgap = gap.ResolutionFiniteGroup(Sgap, n)
-        RS = resolutions.HapResolution(RSgap, S)
+            restr = NumpyMatrixOverZ(S.cocycle_restriction_matrixmap(n,RG, cells_in_orbit, twist, self_is_stabilizer_of_cell=0))
+            cocycleS = NumpyVectorOverZ(cocycle_fn(cell_index, S, RS))
 
-        Athiscell[i] = RS.cocycle_restriction_matrixmap(n,RG, cells, twist, self_is_stabilizer_of_cell=cell_index)
-        cocyclethiscell[i] = cocycle_fn(cell_index, S, RS)
+        delta = get_group_coboundary_matrix(cells_in_orbit, n, G, twist, resolution=RG)
+        cocycleG_orbit = solve_simultaneous_matrix_equation(delta, None, restr, cocycleS)
 
-    A = numpy.concatenate(tuple(Athiscell), axis=0)
-    cocycle = numpy.concatenate(tuple(cocyclethiscell))
+        cocycleG_indexer_orbit = utils.MultiIndexer(RG.rank(n), len(cells))
+        for j in xrange(len(orbit)):
+            for k in xrange(RG.rank(n)):
+                cocycleG[cocycleG_indexer(k,orbit[j])] = cocycleG_orbit[cocycleG_indexer_orbit(k,j)]
 
-    A = NumpyMatrixOverZ(A)
-    cocycle = NumpyVectorOverZ(cocycle)
-    delta = get_group_coboundary_matrix(cells, n,G, twist, resolution=RG)
-
-    return solve_simultaneous_matrix_equation(delta, None, A, cocycle)
+    return cocycleG
 
 #def spinlift_bar(cells, z2_0chain, G):
 #    n=3

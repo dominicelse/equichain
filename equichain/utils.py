@@ -45,6 +45,11 @@ class IndexedSet(object):
         self.el_to_index = dict()
         self.index_to_el = list()
 
+    def subset_by_indices(self, indices):
+        l = IndexedSet()
+        for i in indices:
+            l.append(self.index_to_el[i])
+
     def append(self, o):
         if o not in self.el_to_index:
             self.index_to_el.append(o)
