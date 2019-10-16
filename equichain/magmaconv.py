@@ -4,22 +4,13 @@ import itertools
 import numpy
 import sys
 
-import contextlib
 import magmaconv_cython
 
 from magmaconv_cython import scipy_sparse_matrix_from_magma, numpy_matrix_from_magma,\
         numpy_vector_from_magma
 
-@contextlib.contextmanager
-def printoptions(*args, **kwargs):
-    original = numpy.get_printoptions()
-    numpy.set_printoptions(*args, **kwargs)
-    try:
-        yield
-    finally: 
-        numpy.set_printoptions(**original)
-
 from sage.rings.finite_rings.integer_mod_ring import IntegerModRing_generic
+
 def convert_sage_ring_to_magma(ring):
     if ring == ZZ:
         return magma.IntegerRing()
