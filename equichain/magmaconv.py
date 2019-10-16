@@ -1,7 +1,5 @@
 from sage.all import *
-from scipy import sparse
 import itertools
-import numpy
 
 import magmaconv_cython
 

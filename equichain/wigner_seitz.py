@@ -1,6 +1,4 @@
-import numpy
 import equichain
-import grps
 import itertools
 import utils
 from sage.all import *

@@ -10,9 +10,7 @@ import equichain.resolutions as resolutions
 from equichain.linalg import *
 from sage.all import *
 
-from sage.matrix.matrix_mod2_dense import Matrix_mod2_dense
 
-import cython_fns
 
 from sage.modules.vector_rational_dense import Vector_rational_dense
 
@@ -82,7 +80,6 @@ class PointInUniverse(object):
 
         return ret
 
-from cython_fns import IntegerPointInUniverse,IntegerPointInUniverseTranslationAction
 
 class PointInUniverseTranslationAction(object):
     def __init__(self, trans):
@@ -108,6 +105,8 @@ class PointInUniverseTranslationAction(object):
             trans[i] = 1
             ret.append(PointInUniverseTranslationAction(trans))
         return ret
+
+from cython_fns import IntegerPointInUniverse, IntegerPointInUniverseTranslationAction
 
 class Universe(object):
     def cell_on_boundary(self, cell):
