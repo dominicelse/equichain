@@ -348,8 +348,11 @@ class TrivialPermutee(object):
         return 1
 
 
-def get_group_coboundary_matrix(cells, n,G, twist, resolution='cython_bar'):
+def get_group_coboundary_matrix(cells, n,G, twist, resolution):
     if isinstance(resolution, resolutions.ZGResolution):
+        mapped_cell_indices, mapping_parities = get_group_action_on_cells(cells,G,
+                twist=twist,inverse=True)
+
         return resolution.dual_d_matrix(n, len(cells),
                 mapped_cell_indices, mapping_parities, raw=True)
     else:
