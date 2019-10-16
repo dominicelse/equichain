@@ -33,7 +33,7 @@ if Magma is not available.)
 
 # Usage
 
-After you've installed Sage, you just need to ensure that the equichain/
+After you've installed Sage, you just need to ensure that the `equichain/`
 subdirectory is referenced in the `PYTHONPATH` environment variable. Then you can
 import the `equichain` module, for instance. Note that before running any
 intensive computations, you may want to run
