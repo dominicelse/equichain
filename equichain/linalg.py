@@ -35,8 +35,17 @@ def coefficients_of_quotient(A,B):
     else:
         X = A
 
-    return [n for n in X.elementary_divisors() if n != 1]
+    ret = [int(n) for n in X.elementary_divisors() if n != 1]
 
+    # For rings of order n, "0" in the elementary divisors really means
+    # a Z_n factor, not Z factor, in W/V, so we correct for this.
+    ring_order = X.ring.order()
+    if ring_order < Infinity:
+        for i in xrange(len(ret)):
+            if ret[i] == 0:
+                ret[i] = int(ring_order)
+
+    return ret
 
 def kernel_mod_image(d1,d2, return_module_obj=False):
     # Returns the torsion coefficients of (ker d1)/(im d2), where d1 d2 = 0
