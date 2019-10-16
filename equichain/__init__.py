@@ -70,7 +70,7 @@ class Point(object):
 
         v = vector(tuple(self.coords) + (1,))
         vout = action*v
-        ret = Point(self, vout[:-1])
+        ret = Point(vout[:-1])
 
         return ret
 
