@@ -124,20 +124,3 @@ def space_group_wigner_seitz_barycentric_subdivision(d, G, L=1):
             representatives_helper=None)
 
     return c2.quotient(equiv_relation)
-
-    #starting_pt = gap(starting_pt)
-    #G = gap.StandardAffineCrystGroup(gap.SpaceGroupOnRightIT(d,i))
-    #P = gap.FundamentalDomainStandardSpaceGroup(starting_pt, G)
-    #P = sage_polymake_object_from_gap(P)
-    #   
-    #B = P.barycentric_subdivision()
-    #c = simplicial_cell_complex_from_polymake(B, remember_orientation=False,
-    #        coord_subset=range(1,d+1))
-    #
-    #gens = PointInUniverseTranslationAction.get_translation_basis(d)
-    #equiv_relation = EquivalenceRelationFromCommutingActionGenerators(gens,
-    #        c.all_cells_iterator(), reduce_order=1,
-    #        representatives_helper=None)
-    #
-    #return c.quotient(equiv_relation)
-
