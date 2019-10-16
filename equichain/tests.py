@@ -4,7 +4,6 @@ import equichain
 import equichain.linalg
 import equichain.resolutions
 import numpy
-import itertools
 import cProfile
 
 def make_twistgrp():

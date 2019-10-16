@@ -1,7 +1,6 @@
 from scipy import sparse
 import equichain.utils as utils
 import itertools
-import functools
 import equichain.linalg as linalg
 import numpy
 from sage.all import *

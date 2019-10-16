@@ -3,8 +3,6 @@ from equichain.sageutils import *
 from equichain import wigner_seitz
 from sage.all import *
 import scipy.linalg
-import itertools
-import numpy.matlib
 import string
 gap.load_package("Cryst")
 gap.SetCrystGroupDefaultAction(gap.LeftAction)

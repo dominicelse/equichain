@@ -1,10 +1,6 @@
 from __future__ import division
 import itertools
-import functools
 import numpy
-import scipy.linalg
-import sys
-import warnings
 from scipy import sparse
 
 from equichain.utils import *
@@ -13,7 +9,6 @@ from equichain.sageutils import *
 import equichain.resolutions as resolutions
 from equichain.linalg import *
 from sage.all import *
-from equichain import wigner_seitz
 
 from sage.matrix.matrix_mod2_dense import Matrix_mod2_dense
 

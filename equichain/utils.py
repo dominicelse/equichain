@@ -1,7 +1,6 @@
 import copy
 import numpy
 from scipy import sparse
-import itertools
 from functools import reduce
 import operator
 

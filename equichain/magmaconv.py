@@ -2,7 +2,6 @@ from sage.all import *
 from scipy import sparse
 import itertools
 import numpy
-import sys
 
 import magmaconv_cython
 
