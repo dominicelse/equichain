@@ -14,13 +14,8 @@ from sage.all import *
 
 from sage.modules.vector_rational_dense import Vector_rational_dense
 
-class PointInUniverse(object):
-    def __init__(self, universe, coords):
-        if universe is None:
-            self.universe = FlatUniverse()
-        else:
-            self.universe = universe
-        coords = self.universe.canonicalize_coords(coords)
+class Point(object):
+    def __init__(self, coords):
         if isinstance(coords, Vector_rational_dense):
             self.coords = copy(coords)
         else:
@@ -31,11 +26,10 @@ class PointInUniverse(object):
         return self.__div__(m)
 
     def __div__(self, m):
-        return PointInUniverse(self.universe, self.coords / m)
+        return Point(self.coords / m)
 
     def __add__(a,b):
-        assert a.universe is b.universe
-        return PointInUniverse(a.universe, a.coords + b.coords)
+        return Point(a.coords + b.coords)
 
     def __hash__(self):
         return hash(self.coords)
@@ -68,7 +62,7 @@ class PointInUniverse(object):
         return len(self.coords)
 
     def act_with(self, action):
-        if isinstance(action, PointInUniverseTranslationAction):
+        if isinstance(action, TranslationAction):
             return action(self)
 
         if isinstance(action, MatrixQuotientGroupElement):
@@ -76,12 +70,12 @@ class PointInUniverse(object):
 
         v = vector(tuple(self.coords) + (1,))
         vout = action*v
-        ret = PointInUniverse(self.universe, vout[:-1])
+        ret = Point(self, vout[:-1])
 
         return ret
 
 
-class PointInUniverseTranslationAction(object):
+class TranslationAction(object):
     def __init__(self, trans):
         if isinstance(trans, Vector_rational_dense):
             self.trans = copy(trans)
@@ -89,13 +83,13 @@ class PointInUniverseTranslationAction(object):
             self.trans = vector(QQ, trans)
 
     def __call__(self, pt):
-        return PointInUniverse(pt.universe, pt.coords + self.trans)
+        return Point(pt.coords + self.trans)
 
     def __mul__(x, y):
-        return PointInUniverseTranslationAction(x.trans + y.trans)
+        return TranslationAction(x.trans + y.trans)
 
     def __pow__(self,n):
-        return PointInUniverseTranslationAction(n*self.trans)
+        return TranslationAction(n*self.trans)
 
     @staticmethod
     def get_translation_basis(d):
@@ -103,34 +97,8 @@ class PointInUniverseTranslationAction(object):
         for i in xrange(d):
             trans = [0]*d
             trans[i] = 1
-            ret.append(PointInUniverseTranslationAction(trans))
+            ret.append(TranslationAction(trans))
         return ret
-
-from cython_fns import IntegerPointInUniverse, IntegerPointInUniverseTranslationAction
-
-class Universe(object):
-    def cell_on_boundary(self, cell):
-        return all(not self.point_in_interior(pt) for pt in cell)
-
-    def cell_outside(self, cell):
-        return any(self.point_outside(pt) for pt in cell)
-
-    def contains_cell(self, cell, include_boundary):
-        if self.cell_outside(cell):
-            ret = False
-        else:
-            if include_boundary:
-                ret = True
-            else:
-                ret = not self.cell_on_boundary(cell)
-        return ret
-
-class FlatUniverse(Universe):
-    def canonicalize_coords(self, coords):
-        return coords
-
-    def canonicalize_coords_int(self, coords):
-        return coords
 
 class ConvexHullCell(object):
     def __init__(self,points,orientation):
@@ -297,10 +265,8 @@ def cell_complex_from_polytope(p, coord_subset, remember_orientation=True):
     if remember_orientation:
         raise NotImplementedError
 
-    universe = FlatUniverse()
-
     def conv_vertex(v):
-        return PointInUniverse(universe, [ sage_eval(str(v[i])) for i in coord_subset ])
+        return Point([ sage_eval(str(v[i])) for i in coord_subset ])
 
     vertices = [ conv_vertex(v) for v in p.VERTICES() ]
 

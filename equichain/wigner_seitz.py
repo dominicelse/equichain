@@ -16,7 +16,7 @@ def good_atom_locations(d,G, L=None):
         translated_locs = []
         
         for i in itertools.product(*(xrange(l) for l in L)):
-            trans = equichain.PointInUniverseTranslationAction(i)
+            trans = equichain.TranslationAction(i)
             translated_locs += [ pt.act_with(trans) for pt in locs ]
 
         return translated_locs
@@ -26,7 +26,7 @@ def good_atom_locations(d,G, L=None):
     best = argmax(wyckoff_positions, lambda pos: gap.Size(gap.WyckoffStabilizer(pos)))
     orbit = gap.WyckoffOrbit(best)
 
-    return [ equichain.PointInUniverse(None, gap.WyckoffTranslation(pos).sage())
+    return [ equichain.Point(gap.WyckoffTranslation(pos).sage())
             for pos in orbit ]
 
 def inequalities_array_for_closer_to_one_point(x1, x2, Q):
@@ -76,7 +76,7 @@ def wigner_seitz_cplx(d, spacegrp, L):
     Q = space_group_orthogonality_matrix(d, spacegrp)
 
     gens = [ 
-            equichain.PointInUniverseTranslationAction(L*vector(gen.sage()))
+            equichain.TranslationAction(L*vector(gen.sage()))
             for gen in gap.TranslationBasis(spacegrp)
             ]
 
@@ -114,7 +114,7 @@ def space_group_wigner_seitz_barycentric_subdivision(d, G, L=1):
 
     #gens = list(translation_generators_numpy(ndims,scale=scale,with_inverses=True))
     gens = [ 
-            equichain.PointInUniverseTranslationAction(L*vector(gen.sage()))
+            equichain.TranslationAction(L*vector(gen.sage()))
             for gen in gap.TranslationBasis(G)
             ]
     equiv_relation = equichain.EquivalenceRelationFromCommutingActionGenerators(gens,
