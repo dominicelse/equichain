@@ -4,41 +4,9 @@ from scipy import sparse
 import itertools
 from functools import reduce
 import operator
-from sage.all import gap
-
-def powerset(iterable):
-    "powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"
-    s = list(iterable)
-    return itertools.chain.from_iterable(itertools.combinations(s, r) for r in range(len(s)+1))
 
 def product(factors, starting=1):
     return reduce(operator.mul, factors, starting)
-
-def selection_sort_with_parity(l):
-    l = list(l)
-    parity = 1
-    for i in xrange(len(l)):
-        index_smallest=i
-        for j in xrange(i+1,len(l)):
-            if l[j] < l[index_smallest]:
-                index_smallest = j
-            elif l[j] == l[index_smallest]:
-                raise ValueError, "Two elements of list are identical."
-        if index_smallest != i:
-            l[i], l[index_smallest] = l[index_smallest], l[i]
-            parity *= -1
-    return l,parity
-
-class ElementWiseArray(tuple):
-    def __new__(cls, a):
-        return super(ElementWiseArray,cls).__new__(cls,a)
-
-    def __mod__(self, other):
-        assert len(self) == len(other)
-        return ElementWiseArray([x % y for (x,y) in itertools.izip(self,other)])
-    def __add__(self, other):
-        assert len(self) == len(other)
-        return ElementWiseArray([x + y for (x,y) in itertools.izip(self,other)])
 
 class IndexedSet(object):
     def __init__(self):
