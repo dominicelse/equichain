@@ -118,27 +118,24 @@ class GenericMatrix(object):
         return self.to_sagedense().pivots()
 
     def column_space_matrix(self):
-        #print "column_space_matrix:", self.A.shape
         ret = self._constructor(self.A[:,self.pivots()])
-        #print "column_space_matrix: done" 
         return ret
 
     def elementary_divisors(self):
         return self.to_sagedense().elementary_divisors()
 
-    #def solve_right(self, v):
-    #    try:
-    #        ret = v.convert_to_like_self(self.to_sagedense().solve_right(v.to_sagedense()))
-    #    except ValueError as e:
-    #        if e.args[0] == "matrix equation has no solutions":
-    #            raise NoSolutionError
-    #        else:
-    #            raise e
-    #    return ret
-
     def solve_right(self, v):
-        ret = v.convert_to_like_self_preserve_density(self.to_magmadense().solve_right(v))
-        return ret
+        if use_magma:
+            return v.convert_to_like_self_preserve_density(self.to_magmadense().solve_right(v))
+        else:
+            try:
+                ret = v.convert_to_like_self(self.to_sagedense().solve_right(v.to_sagedense()))
+            except ValueError as e:
+                if e.args[0] == "matrix equation has no solutions":
+                    raise NoSolutionError
+                else:
+                    raise e
+            return ret
 
     def __getitem__(self, i):
         if ( (isinstance(i, tuple) and any(isiterable_or_slice(x) for x in i)) or
@@ -563,16 +560,14 @@ class SageDenseMatrix(GenericMatrix):
     def ring(self):
         return self.A.base_ring()
 
-    #def solve_right(self, b):
-    #    return b._constructor(self.backend_obj.solve_right(b.backend_obj).change_ring(b.ring))
+    def solve_right(self, b):
+        return b._constructor(self.backend_obj.solve_right(b.backend_obj).change_ring(b.ring))
 
     @property
     def density(self):
         return "dense"
 
     def right_kernel_matrix_(self):
-        #print "right_kernel_matrix:", (self.A.nrows(), self.A.ncols())
-        
         # Flint is a lot faster than the default algorithm when working over the
         # integers.
         if self.ring is ZZ:
@@ -582,7 +577,6 @@ class SageDenseMatrix(GenericMatrix):
 
         ret = SageDenseMatrix(self.A.right_kernel_matrix(basis='computed', **kwargs).transpose())
 
-        #print "right_kernel_matrix: done"
         return ret
 
     def column_space_sage(self):
@@ -599,7 +593,6 @@ class MagmaMatrix(GenericMatrix):
         raise NotImplementedError
 
     def right_kernel_matrix_(self):
-        #print "Calling magma right_kernel_matrix_:", self.density
         # Note that Magma uses the opposite ordering, hence all the transposes
         ret = MagmaDenseMatrix( 
                 magma.Transpose(magma.KernelMatrix(magma.Transpose(self.A))), self.ring)
@@ -718,27 +711,6 @@ def ScipySparseMatrixOverRing(A, ring):
     else:
         raise NotImplementedError
 
-#def column_space_intersection_with_other_space(B, other_space_basis_matrix, encoder):
-#    W = numpy.bmat([[other_space_basis_matrix, -column_space_matrix(B,encoder)]])
-#    Wsage = encoder.sage_matrix_from_numpy(W)
-#    kernel_matrix = Wsage.right_kernel_matrix(basis='computed')
-#
-#    ret = [ encoder.numpy_matrix_multiply(
-#                other_space_basis_matrix,
-#                encoder.sage_matrix_to_numpy(kernel_matrix.transpose()[0:other_space_basis_matrix.shape[1],i]).flatten(),
-#           ) for i in xrange(kernel_matrix.nrows()) ]
-#
-#    return ret
-
-#def column_space_intersection_with_other_space(B, other_space_basis_matrix, field):
-#    Bsage = matrix(field, B)
-#    column_space = Bsage.column_space()
-#    other_space = span([ vector(field, other_space_basis_matrix[:,i]) for i in
-#        xrange(other_space_basis_matrix.shape[1]) ])
-#    intersection = column_space.intersection(other_space)
-#
-#    return [ v for v in intersection.basis() ]
-
 def image_of_constrained_subspace(A,B, basis=True):
     """ Finds the image V of ker B under A.
 
@@ -752,24 +724,8 @@ def image_of_constrained_subspace(A,B, basis=True):
 
     if basis:
         raise NotImplementedError
-    #if A.dtype != B.dtype:
-    #    raise TypeError
-
-    #AB = numpy.empty( (A.shape[0] + B.shape[0], A.shape[1]), A.dtype)
-    #AB[0:A.shape[0],:] = A
-    #AB[A.shape[0]:,:] = B
-
-    #a = encoder.numpy_eye(A.shape[0])
-    #b = encoder.numpy_zeros( (B.shape[0],A.shape[0]) )
-    #target_space_basis = numpy.array(numpy.bmat([[a],
-    #                                             [b]]))
-    #return [ v[0:A.shape[0]] for v in column_space_intersection_with_other_space(AB, target_space_basis,
-    #            encoder) ]
 
     K = B.right_kernel_matrix()
     AK = A.dot(K)
 
     return AK
-    #return AK.column_space_matrix()
-    #scipy.io.savemat('K.mat', {'B': B, 'K': K, 'C': C})
-    #return [C[:,i].flat for i in xrange(C.shape[1])]
