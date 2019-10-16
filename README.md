@@ -33,7 +33,7 @@ license. If Magma is installed properly, i.e. the `magma` command is in your
 # Usage
 
 After you've installed Sage, you just need to ensure that the equichain/
-subdirectory is referenced in the PYTHONPATH environment variable. Then you can
+subdirectory is referenced in the `PYTHONPATH` environment variable. Then you can
 import the `equichain` module, for instance. Note that before running any
 intensive computations, you may want to run
 
@@ -41,12 +41,10 @@ intensive computations, you may want to run
 import sage.interfaces.gap
 sage.interfaces.gap.gap = sage.interfaces.gap.Gap(max_workspace_size = "4g")
 ```
-(replace `"4g"` with an appropriate value)
-
-to increase the amount of memory available to GAP.
+(replace `"4g"` with an appropriate value) to increase the amount of memory available to GAP.
 
 The main workhorse for the computations in the paper is the
-`equichain.lsm.check_space_group()' function. Type
+`equichain.lsm.check_space_group()` function. Type
 ```
 import equichain.lsm
 help(equichain.lsm.check_space_group)
