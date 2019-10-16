@@ -27,7 +27,8 @@ greatly improve performance and memory usage. The Magma website can be found at
 [http://magma.maths.usyd.edu.au/magma/], but the software is not open source and
 requires a pretty hefty license fee unless your institution already has a site
 license. If Magma is installed properly, i.e. the `magma` command is in your
-`PATH`, then `equichain` will use it automatically.
+`PATH`, then `equichain` will use it automatically. (A warning will be spit out
+if Magma is not available.)
 
 
 # Usage
