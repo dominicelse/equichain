@@ -9,27 +9,6 @@ import string
 gap.load_package("Cryst")
 gap.SetCrystGroupDefaultAction(gap.LeftAction)
 
-class TorusTranslationGroup(object):
-    def __init__(self, *dims):
-        self.dims = numpy.array(dims, dtype=int)
-
-        self.els = [g for g in self]
-        self.els_reverse_lookup = dict()
-        for (i,g) in enumerate(self):
-            self.els_reverse_lookup[self.els[i]] = i
-
-    def __iter__(self):
-        return (TorusTranslationGroupElement(self, i) for i in itertools.product(*( xrange(d) for d in self.dims )))
-
-    def size(self):
-        return numpy.prod(self.dims)
-
-    def element_by_index(self,i):
-        return self.els[i]
-
-    def element_to_index(self,g):
-        return self.els_reverse_lookup[g]
-
 class MatrixQuotientGroupElement(object):
     pass
 
@@ -429,100 +408,11 @@ class GapAffineQuotientGroupElement(MatrixQuotientGroupElement):
         raise NotImplementedError
         return self.G.basegrp.element_to_index(self)
 
-class FiniteAbelianGroup(object):    
-    def __init__(self, n):
-        self.n = ElementWiseArray(n)
-
-        self.els = [g for g in self]
-        self.els_reverse_lookup = dict()
-        for (i,g) in enumerate(self):
-            self.els_reverse_lookup[self.els[i]] = i
-
-    def element_to_index(self,g):
-        return self.els_reverse_lookup[g]
-
-    def element_by_index(self,i):
-        return self.els[i]
-
-    def identity(self):
-        return FiniteAbelianGroupElement(self)
-
-    def __iter__(self):
-        for x in itertools.product(*([range(n) for n in self.n])):
-            yield FiniteAbelianGroupElement(self, x)
-
-    def generators(self):
-        for i in xrange(len(self.n)):
-            k = [0]*len(self.n)
-            k[i] = 1
-            yield FiniteAbelianGroupElement(self, k)
-            
-    def el(self, k):
-        return FiniteAbelianGroupElement(self, k)
-
-    def size(self):
-        return numpy.prod(self.n)
-
-class FiniteAbelianGroupElement(object):
-    def __eq__(self, b):
-        return self.k == b.k
-    def __ne__(self,b):
-        return not self == b
-    def __hash__(self):
-        return hash(self.k)
-
-    def __init__(self, group, k=None):
-        if k is not None:
-            self.k = ElementWiseArray(k)
-        else:
-            self.k = ElementWiseArray([0]*len(group.n))
-        self.group = group
-
-    def parent(self):
-        return self.group
-
-    def toindex(self):
-        return self.group.element_to_index(self)
-
-    def __nonzero__(self):
-        return any(self.k)
-
-    def __mul__(a, b):
-        if a.group is not b.group and a.group != b.group:
-            raise ValueError, "Can only multiply elements of the same group."
-        return FiniteAbelianGroupElement(a.group, (a.k + b.k) % a.group.n)
-
-    def __repr__(self):
-        return str(tuple(self.k))
-
-    def __pow__(self,p):
-        return FiniteAbelianGroupElement(self.group, [(self.k[i]*p) % self.group.n[i] for i in xrange(len(self.k))])
-
 def affine_transformation_rescale(A,scale):
     A = copy(A)
     d = A.nrows()-1
     A[0:d,d] *= scale
     return A
-
-def translation_generators_sage(d):
-    for i in xrange(d):
-        A = matrix(ZZ, d+1,d+1)
-        A[i,d] = 1
-        for j in xrange(d+1):
-            A[j,j] = 1
-        yield A
-
-def translation_generators_numpy(d, scale=1, with_inverses=False):
-    for i in xrange(d):
-        A = numpy.matlib.eye(d+1)
-        A[i,d] = scale
-        yield A
-
-    if with_inverses:
-        for i in xrange(d):
-            A = numpy.matlib.eye(d+1)
-            A[i,d] = -scale
-            yield A
 
 def affine_transformation_from_translation_vector_sage(v):
     d = len(v)
