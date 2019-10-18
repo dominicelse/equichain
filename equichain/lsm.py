@@ -71,6 +71,8 @@ def check_space_group(i, soc=False, d=3):
     The tuple (sp_0, ..., sp_d) [see description above].
     """
 
+    gap.load_package("hap")
+
     if d not in (2,3):
         raise NotImplementedError, \
                 "Currently the space dimension must be either 2 or 3."
