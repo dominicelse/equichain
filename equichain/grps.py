@@ -366,6 +366,10 @@ class TwistedIntegers(object):
         self.factors = [ action_on_Z_fn(g) for (i,g) in enumerate(G) ]
 
     @staticmethod
+    def untwisted(G):
+        return TwistedIntegers(G, lambda g: 1)
+
+    @staticmethod
     def from_orientation_reversing(G):
         def action_on_Z_fn(g):
             det = gap.Determinant(g.as_matrix_representative())

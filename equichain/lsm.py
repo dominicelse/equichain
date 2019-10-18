@@ -16,6 +16,7 @@
 
 from sage.all import *
 import equichain
+import equichain.grps
 import equichain.wigner_seitz
 import equichain.resolutions
 
@@ -38,8 +39,6 @@ def check_space_group(i, soc=False, d=3):
 
     * For the case where the input parameter soc = True:
         A_0 := h_{-3}^{G_pt}(X_0, Z),
-        with the appropriate twists in the definition of equivariant homology
-        for the case of orientation-reversing elements of G_pt.
 
     * In both cases, A_r is the image of A_0 under the map in equivariant homology induced by
         the embedding X_0 -> X_r.
@@ -90,7 +89,8 @@ def check_space_group(i, soc=False, d=3):
         k=0
         ring = Integers(2)
 
-    twist = equichain.TwistedIntegers.from_orientation_reversing(Gq)
+    #twist = equichain.grps.TwistedIntegers.from_orientation_reversing(Gq)
+    twist = equichain.grps.TwistedIntegers.untwisted(Gq)
 
     resolution = equichain.resolutions.HapResolution(
             gap.ResolutionFiniteGroup(Gq.gap_quotient_grp, n+(d-k)-1),
