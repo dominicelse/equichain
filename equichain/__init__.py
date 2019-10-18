@@ -285,23 +285,23 @@ def cell_complex_from_polytope(p, coord_subset, remember_orientation=True):
     def conv_vertex(v):
         return Point([ sage_eval(str(v[i])) for i in coord_subset ])
 
-    vertices = [ conv_vertex(v) for v in p.VERTICES() ]
+    vertices = [ conv_vertex(v) for v in p.VERTICES ]
 
     def conv_cell(c):
         vertices_in_cell = [ vertices[int(i)] for i in c ]
         cell = ConvexHullCell(vertices_in_cell, orientation=None)
         return cell
 
-    cells = [ conv_cell(c) for c in p.HASSE_DIAGRAM().FACES() ]
+    cells = [ conv_cell(c) for c in p.HASSE_DIAGRAM.FACES() ]
 
-    d = int(p.CONE_DIM())-1
+    d = int(p.CONE_DIM)-1
     cplx = CellComplex(d)
     for k in xrange(d+1):
-        for face in p.HASSE_DIAGRAM().nodes_of_dim(k):
+        for face in p.HASSE_DIAGRAM.nodes_of_dim(k):
             i = int(face)
             if k > 0:
                 boundary = FormalIntegerSum(dict( (cells[int(bi)],1) for 
-                    bi in p.HASSE_DIAGRAM().ADJACENCY().in_adjacent_nodes(i) ))
+                    bi in p.HASSE_DIAGRAM.ADJACENCY.in_adjacent_nodes(i) ))
             else:
                 boundary = FormalIntegerSum()
             cplx.add_cell(k, cells[int(face)], boundary)
