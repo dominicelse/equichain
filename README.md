@@ -9,6 +9,9 @@ The prerequisite is Sage, which can be downloaded at:
 
 https://www.sagemath.org/
 
+I have successfully run `equichain' with Sage version 8.9. Any other versions
+may or may not work.
+
 You will have to compile it from source. (The binary packages available on
 SageMath don't let you install optional Sage packages, which you will need.
 Although there are also now Sage packages available in the Ubuntu repositories,
@@ -17,8 +20,13 @@ Ubuntu 18.04).
 
 Performance will be greatly improved if you use the patched Sage sources
 available at [https://github.com/dominicelse/sage/], which implement some more
-efficient routines for initializing Sage matrices that this code can take
+efficient routines for initializing Sage matrices that `equichain`can take
 advantage of.
+
+After compiling Sage, you need to install some optional packages with
+```sage -i gap_packages polymake perl_term_readline_gnu```
+This will take a little while and might also prompt you to confirm installing
+experimental packages.
 
 As Sage doesn't provide routines for sparse matrix linear algebra over the
 integers or finite fields, `equichain` uses the dense matrix routines instead.
