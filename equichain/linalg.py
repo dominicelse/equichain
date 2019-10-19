@@ -150,17 +150,17 @@ class GenericMatrix(object):
         return self.to_sagedense().elementary_divisors()
 
     def solve_right(self, v):
-        if use_magma:
-            return v.convert_to_like_self_preserve_density(self.to_magmadense().solve_right(v))
-        else:
-            try:
-                ret = v.convert_to_like_self(self.to_sagedense().solve_right(v.to_sagedense()))
-            except ValueError as e:
-                if e.args[0] == "matrix equation has no solutions":
-                    raise NoSolutionError
-                else:
-                    raise e
-            return ret
+        #if use_magma:
+        #    return v.convert_to_like_self_preserve_density(self.to_magmadense().solve_right(v))
+        #else:
+        try:
+            ret = v.convert_to_like_self(self.to_sagedense().solve_right(v.to_sagedense()))
+        except ValueError as e:
+            if e.args[0] == "matrix equation has no solutions":
+                raise NoSolutionError
+            else:
+                raise e
+        return ret
 
     def __getitem__(self, i):
         if ( (isinstance(i, tuple) and any(isiterable_or_slice(x) for x in i)) or
