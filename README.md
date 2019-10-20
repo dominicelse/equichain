@@ -9,7 +9,7 @@ The prerequisite is Sage, which can be downloaded at:
 
 https://www.sagemath.org/
 
-I have successfully run `equichain' with Sage version 8.9. Any other versions
+I have successfully run `equichain` with Sage version 8.9. Any other versions
 may or may not work.
 
 You will have to compile it from source. (The binary packages available on
@@ -24,7 +24,9 @@ efficient routines for initializing Sage matrices that `equichain`can take
 advantage of.
 
 After compiling Sage, you need to install some optional packages with
-```sage -i gap_packages polymake perl_term_readline_gnu```
+```
+sage -i gap_packages polymake perl_term_readline_gnu
+```
 This will take a little while and might also prompt you to confirm installing
 experimental packages.
 
