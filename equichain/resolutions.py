@@ -32,8 +32,8 @@ class ZGResolution(object):
 
         d_matrix = self.d_matrix(n+1)
 
-        for mu in xrange(ncells):
-            for j,alpha,value in itertools.izip(*sparse.find(d_matrix.raw_access())):
+        for mu in range(ncells):
+            for j,alpha,value in zip(*sparse.find(d_matrix.raw_access())):
                 g,beta = d_matrix.out_indexer.from_index(j)
                 D[(alpha,mu), 
                   (beta,mapped_cell_indices[g,mu])] += \
@@ -68,13 +68,13 @@ class BarResolution(ZGResolution):
                 in_indexer = utils.MultiIndexer.tensor(self.G.size(), n)
                 )
 
-        for gi in itertools.product(*( (xrange(self.G.size()),) * n )):
+        for gi in itertools.product(*( (range(self.G.size()),) * n )):
             g = [ self.G.element_by_index(gii) for gii in gi ]
 
             d[ (gi[0],) + gi[1:], gi ] += 1
             d[ (0,) + gi[0:-1], gi ] += (-1)**n
 
-            for i in xrange(1,n):
+            for i in range(1,n):
                 a = (
                       gi[0:(i-1)] + 
                       (self.G.element_to_index(g[i-1]*g[i]),) + 
@@ -101,7 +101,7 @@ class HapResolution(ZGResolution):
 
     def rank(self,k):
         if not (k >= 0 and k <= self.length):
-            raise IndexError, k
+            raise IndexError(k)
         if k in self.cached_dimensions:
             return self.cached_dimensions[k]
         else:
@@ -111,7 +111,7 @@ class HapResolution(ZGResolution):
 
     def _compute_d_matrix_raw(self,k):
         if not (k >= 1 and k <= self.length):
-            raise ValueError, "Bad k", k
+            raise ValueError("Bad k").with_traceback(k)
 
         d = utils.MatrixIndexingWrapper.from_factory(utils.COOMatrixHelper, int,
                 out_indexer = utils.MultiIndexer(self.G.size(), self.rank(k-1)),
@@ -122,7 +122,7 @@ class HapResolution(ZGResolution):
         elts = self.R.elts()
         index_map = [ self.G.element_to_index(self.G.element_from_gap(g)) for g in elts ]
 
-        for m in xrange(d.in_indexer.total_dim()):
+        for m in range(d.in_indexer.total_dim()):
             acted_m = self.R.boundary(k, m+1)
 
             for i, gi_hap in acted_m:

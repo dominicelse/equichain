@@ -74,8 +74,7 @@ def check_space_group(i, soc=False, d=3):
     gap.load_package("hap")
 
     if d not in (2,3):
-        raise NotImplementedError, \
-                "Currently the space dimension must be either 2 or 3."
+        raise NotImplementedError("Currently the space dimension must be either 2 or 3.")
 
     G = gap.SpaceGroupIT(d,i)
     Gq = equichain.grps.GapAffineQuotientGroup(G,d=d)
@@ -102,7 +101,7 @@ def check_space_group(i, soc=False, d=3):
     sp = [None]*(d+1)
 
     page_fns = [equichain.E1page,equichain.E2page,equichain.E3page]
-    for i in xrange(d):
+    for i in range(d):
         sp[i] = page_fns[i](cplx,n,k,Gq,ring=ring,twist=twist,resolution=resolution)
 
     sp[d] = sp[d-1] # This only works because G_pt does not leave any

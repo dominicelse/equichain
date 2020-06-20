@@ -68,7 +68,7 @@ class MagneticTorusTranslationGroupElement(MatrixQuotientGroupElement):
             elif genname == 'f2':
                 cur_t = vector([1,0])
             else:
-                print "unexpected genname:", genname
+                print("unexpected genname:", genname)
                 assert False
 
             t += cur_t*power
@@ -131,7 +131,7 @@ class MagneticTorusTranslationGroup(object):
         assert len(fluxcoeffs) == An
 
         for L in Lx,Ly:
-            assert all(fluxcoeffs[i]*L % A_torsion_coeffs[i] == 0 for i in xrange(An))
+            assert all(fluxcoeffs[i]*L % A_torsion_coeffs[i] == 0 for i in range(An))
 
         A_gennames = string.ascii_lowercase[0:An]
 
@@ -143,22 +143,22 @@ class MagneticTorusTranslationGroup(object):
         gens = gap.GeneratorsOfGroup(F)
         Tx = gens[1]
         Ty = gens[2]
-        Agens = [ gens[i+3] for i in xrange(An) ]
+        Agens = [ gens[i+3] for i in range(An) ]
 
         flux = Agens[0]**fluxcoeffs[0]
-        for i in xrange(1,An):
+        for i in range(1,An):
             flux *= Agens[i]**fluxcoeffs[i]
 
         relations = [ gap.Comm(Tx,Ty)*flux ]
-        for i in xrange(An):
+        for i in range(An):
             relations.append(Agens[i] ** A_torsion_coeffs[i])
             relations.append(gap.Comm(Tx, Agens[i]))
             relations.append(gap.Comm(Ty, Agens[i]))
         relations.append(Tx**Lx)
         relations.append(Ty**Ly)
 
-        for i in xrange(An):
-            for j in xrange(1,An):
+        for i in range(An):
+            for j in range(1,An):
                 relations.append(gap.Comm(Agens[i], Agens[j]))
 
         relations = gap(relations)
@@ -182,7 +182,7 @@ class GapAffineQuotientGroup(object):
 
         self.els = [g for g in self.sage_quotient_grp]
         self.els_reverse_lookup = dict()
-        for i in xrange(len(self.els)):
+        for i in range(len(self.els)):
             self.els_reverse_lookup[self.els[i]] = i
 
         self.stored_coset_representatives_numpy_int = None
@@ -274,7 +274,7 @@ class GapAffineQuotientGroup(object):
     def _compute_coset_representatives_numpy_int(self):
         self.stored_coset_representatives_numpy_int = dict(
                 (g, sage_matrix_to_numpy_int(A))
-                for g,A in self.stored_coset_representatives.iteritems()
+                for g,A in self.stored_coset_representatives.items()
                 )
 
     def coset_representative_numpy_int(self,g):
@@ -285,7 +285,7 @@ class GapAffineQuotientGroup(object):
     def _compute_coset_representatives_numpy(self):
         self.stored_coset_representatives_numpy = dict(
                 (g, A.numpy(dtype=float))
-                for g,A in self.stored_coset_representatives.iteritems()
+                for g,A in self.stored_coset_representatives.items()
                 )
 
     def coset_representative_numpy(self,g):
@@ -374,7 +374,7 @@ class TwistedIntegers(object):
         def action_on_Z_fn(g):
             det = gap.Determinant(g.as_matrix_representative())
             if int(det) not in [1,-1]:
-                raise ValueError, "Determinant was not +/- 1!"
+                raise ValueError("Determinant was not +/- 1!")
             return det
         return TwistedIntegers(G, action_on_Z_fn)
 
@@ -435,7 +435,7 @@ def affine_transformation_rescale(A,scale):
 def affine_transformation_from_translation_vector_sage(v):
     d = len(v)
     A = matrix(ZZ, d+1, d+1)
-    for i in xrange(d):
+    for i in range(d):
         A[i,i] = 1
     A[0:d,d] = v
     return A

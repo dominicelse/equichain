@@ -51,9 +51,9 @@ def magma_sparse_matrix_from_scipy(A, ring):
     A = A.tocsr()
 
     magmadata = AutoIncrList(2*A.nnz + A.shape[0])
-    for i in xrange(A.shape[0]):
+    for i in range(A.shape[0]):
         magmadata.append(A.indptr[i+1]-A.indptr[i])
-        for indx,val in itertools.izip(
+        for indx,val in zip(
                 A.indices[A.indptr[i]:A.indptr[i+1]]+1,
                 A.data[A.indptr[i]:A.indptr[i+1]]):
             magmadata.append(indx)

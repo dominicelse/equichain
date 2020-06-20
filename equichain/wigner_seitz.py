@@ -16,7 +16,7 @@
 
 import equichain
 import itertools
-import utils
+from . import utils
 from sage.all import *
 
 def argmax(l, f):
@@ -31,7 +31,7 @@ def good_atom_locations(d,G, L=None):
 
         translated_locs = []
         
-        for i in itertools.product(*(xrange(l) for l in L)):
+        for i in itertools.product(*(range(l) for l in L)):
             trans = equichain.TranslationAction(i)
             translated_locs += [ pt.act_with(trans) for pt in locs ]
 
@@ -85,7 +85,7 @@ def space_group_orthogonality_matrix(d,G):
         return P
 
 
-    raise RuntimeError, "Could not find orthogonality matrix!"
+    raise RuntimeError("Could not find orthogonality matrix!")
 
 def wigner_seitz_cplx(d, spacegrp, L):
     basepoints = set(good_atom_locations(d, spacegrp,[L]*d))
@@ -99,10 +99,10 @@ def wigner_seitz_cplx(d, spacegrp, L):
     max_order = 2 # Is this sufficient?
 
     def iterate_neighbors():
-        for k in itertools.product(range(-max_order,max_order+1), repeat=len(gens)):
+        for k in itertools.product(list(range(-max_order,max_order+1)), repeat=len(gens)):
             if all(kk == 0 for kk in k):
                 continue
-            g = utils.product( (gens[i]**k[i] for i in xrange(1,len(gens))), gens[0]**k[0]  )
+            g = utils.product( (gens[i]**k[i] for i in range(1,len(gens))), gens[0]**k[0]  )
             for pt in basepoints:
                 acted = pt.act_with(g)
                 yield pt.act_with(g)
@@ -114,7 +114,7 @@ def wigner_seitz_cplx(d, spacegrp, L):
         otherbasepts = [ pt for pt in basepoints if pt != basept ]
         cell = voronoi_cell_wrt_neighboring_points(basept, neighbors + otherbasepts, Q)
         cplx_for_cell = equichain.cell_complex_from_polytope(cell,
-                remember_orientation=False, coord_subset=range(1,d+1))
+                remember_orientation=False, coord_subset=list(range(1,d+1)))
 
         if cplx is None:
             cplx = cplx_for_cell

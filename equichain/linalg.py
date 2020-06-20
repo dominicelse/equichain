@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with equichain.  If not, see <https://www.gnu.org/licenses/>.
 
-from __future__ import division
+
 from sage.all import *
 import numpy
 from equichain import magmaconv
@@ -34,7 +34,7 @@ if hasattr(A, 'set_unsafe_from_numpy_int_array'):
     patched_sage = True
 else:
     patched_sage = False
-    print "WARNING: patched Sage not found; performance will be much slower"
+    print("WARNING: patched Sage not found; performance will be much slower")
 
 def coefficients_of_quotient(A,B):
     """ Let V and W be the column spaces of A and B respectively, and assume that V <= W.
@@ -57,7 +57,7 @@ def coefficients_of_quotient(A,B):
     # a Z_n factor, not Z factor, in W/V, so we correct for this.
     ring_order = X.ring.order()
     if ring_order < Infinity:
-        for i in xrange(len(ret)):
+        for i in range(len(ret)):
             if ret[i] == 0:
                 ret[i] = int(ring_order)
 
@@ -193,8 +193,8 @@ class NumpyMatrixFactoryBase(object):
         if not isinstance(block[0], list):
             block = [block]
 
-        for i in xrange(len(block)):
-            for j in xrange(len(block[i])):
+        for i in range(len(block)):
+            for j in range(len(block[i])):
                 if block[i][j] is None:
                     continue
 
@@ -522,7 +522,7 @@ def solve_matrix_equation_with_constraint(A, subs_indices, xconstr):
     subs_indices_list = list(subs_indices)
     subs_indices_set = frozenset(subs_indices)
 
-    notsubs_indices_set = frozenset(xrange(A.shape[1])) - subs_indices_set
+    notsubs_indices_set = frozenset(range(A.shape[1])) - subs_indices_set
     notsubs_indices_list = list(notsubs_indices_set)
 
     assert len(xconstr) == A.shape[1]
@@ -564,7 +564,7 @@ from sage.matrix.matrix_dense import Matrix_dense
 class SageDenseMatrix(GenericMatrix):
     def __init__(self,A):
         if not isinstance(A, Matrix_dense):
-            raise TypeError, "Input to SageDenseMatrix constructor must be a sage dense matrix object."
+            raise TypeError("Input to SageDenseMatrix constructor must be a sage dense matrix object.")
         self.A = A
         self._constructor = SageDenseMatrix
 
@@ -710,7 +710,7 @@ def numpy_dtype_for_ring(ring):
     elif isinstance(ring, IntegerModRing_generic):
         return int
     else:
-        raise NotImplementedError, ring
+        raise NotImplementedError(ring)
 
 def NumpyMatrixOverRing(A, ring):
     if ring is ZZ:

@@ -15,7 +15,7 @@
 # along with equichain.  If not, see <https://www.gnu.org/licenses/>.
 
 
-from __future__ import division
+
 import itertools
 import numpy
 from scipy import sparse
@@ -111,7 +111,7 @@ class TranslationAction(object):
     @staticmethod
     def get_translation_basis(d):
         ret = []
-        for i in xrange(d):
+        for i in range(d):
             trans = [0]*d
             trans[i] = 1
             ret.append(TranslationAction(trans))
@@ -126,7 +126,7 @@ class ConvexHullCell(object):
 
     def midpoint(self):
         i = (pt.coords for pt in self.points)
-        return (i.next() + sum(i)) / len(self.points)
+        return (next(i) + sum(i)) / len(self.points)
 
     def center(self):
         points = list(self.points)
@@ -192,7 +192,7 @@ class QuotientCell(object):
 
     def boundary(self):
         return FormalIntegerSum( dict( (QuotientCell(k,self.equivalence_relation),v) for k,v in
-                self.representative_cell.boundary().coeffs.iteritems() ) )
+                self.representative_cell.boundary().coeffs.items() ) )
 
     def __str__(self):
         return repr(self)
@@ -248,9 +248,9 @@ class EquivalenceRelationFromCommutingActionGenerators(object):
         if max_order is None:
             max_order = self.default_max_order
 
-        for morder in xrange(max_order+1):
-            for k in itertools.product(range(-morder,morder+1), repeat=len(self.gens)):
-                g = product( (self.gens[i]**k[i] for i in xrange(1,len(self.gens))),
+        for morder in range(max_order+1):
+            for k in itertools.product(list(range(-morder,morder+1)), repeat=len(self.gens)):
+                g = product( (self.gens[i]**k[i] for i in range(1,len(self.gens))),
                         self.gens[0]**k[0] )
                 acted_cell = cell.act_with(g)
                 if acted_cell in self.representatives:
@@ -264,7 +264,7 @@ class EquivalenceRelationFromCommutingActionGenerators(object):
         if return_bool:
             return False
         else:
-            raise RuntimeError, "Cell doesn't appear to have a representative."
+            raise RuntimeError("Cell doesn't appear to have a representative.")
 
     def are_equivalent(self, cell1, cell2):
         return self.canonical_representative(cell1) == self.canonical_representative(cell2)
@@ -296,7 +296,7 @@ def cell_complex_from_polytope(p, coord_subset, remember_orientation=True):
 
     d = int(p.CONE_DIM)-1
     cplx = CellComplex(d)
-    for k in xrange(d+1):
+    for k in range(d+1):
         for face in p.HASSE_DIAGRAM.nodes_of_dim(k):
             i = int(face)
             if k > 0:
@@ -333,7 +333,7 @@ def get_group_coboundary_matrix(cells, n,G, twist, resolution):
         return resolution.dual_d_matrix(n, len(cells),
                 mapped_cell_indices, mapping_parities, raw=True)
     else:
-        raise NotImplementedError, "Unidentified resolution."
+        raise NotImplementedError("Unidentified resolution.")
 
 class ComplexNotInvariantError(Exception):
     pass
@@ -342,7 +342,7 @@ def get_action_on_cells(cells,action):
     mapped_cell_indices = numpy.empty( len(cells), dtype=int)
     mapping_parities = numpy.empty( len(cells), dtype=int)
 
-    for i in xrange(len(cells)):
+    for i in range(len(cells)):
         acted_cell = cells[i].act_with(action)
         try:
             acted_ci = cells.index(acted_cell)
@@ -397,7 +397,7 @@ class OrderedSimplex(object):
             return FormalIntegerSum({})
 
         coeffs = {}
-        for i in xrange(n):
+        for i in range(n):
             reduced_word = self.vertices[0:i] + self.vertices[(i+1):]
             coeffs[OrderedSimplex(reduced_word)] = (-1)**i
 
@@ -419,14 +419,14 @@ class OrderedSimplex(object):
         return "SIMPLEX" + str(self.vertices)
 
 def group_orbits(cells,  G):
-    cell_indices = set(xrange(len(cells)))
+    cell_indices = set(range(len(cells)))
     
     orbits = []
 
     while len(cell_indices) > 0:
         orbit = set()
 
-        i = iter(cell_indices).next()
+        i = next(iter(cell_indices))
 
         for g in G:
             j = _get_action_on_cell_index(cells,g,i)
@@ -447,17 +447,17 @@ class CellComplex(object):
         ndims = cplx1.ndims
 
         ret = CellComplex(cplx1.ndims)
-        for k in xrange(ndims+1):
+        for k in range(ndims+1):
             cells1 = set(cplx1.cells[k])
             cells2 = set(cplx2.cells[k])
 
             common_cells = cells1.intersection(cells2)
             if k in check_not_disjoint_dimensions and len(common_cells) == 0:
-                raise RuntimeError, "No common cells of dimension " + str(k) + "!"
+                raise RuntimeError("No common cells of dimension " + str(k) + "!")
 
             for common_cell in cells1.intersection(cells2):
                 if cplx1.boundary_data[common_cell] != cplx2.boundary_data[common_cell]:
-                    raise ValueError, "Can't merge cells -- they don't have the same boundary."
+                    raise ValueError("Can't merge cells -- they don't have the same boundary.")
 
             for cell in cells1.difference(cells2):
                  ret.add_cell(k, cell, cplx1.boundary_data[cell])
@@ -482,7 +482,7 @@ class CellComplex(object):
     def quotient(self, equiv_relation):
         cplx = CellComplex(self.ndims)
 
-        for k in xrange(self.ndims+1):
+        for k in range(self.ndims+1):
             quotient_cells = set(QuotientCell(cell,equiv_relation) for cell in self.cells[k])
             for q in quotient_cells:
                 cplx.add_cell(k, q)
@@ -490,7 +490,7 @@ class CellComplex(object):
         return cplx
 
     def _all_contained_cells_iterator_unoriented(self, cell):
-        for boundary_cell in self.boundary_data[cell].coeffs.keys():
+        for boundary_cell in list(self.boundary_data[cell].coeffs.keys()):
             yield boundary_cell.forget_orientation()
             for c in self._all_contained_cells_iterator_unoriented(boundary_cell):
                 yield c
@@ -523,7 +523,7 @@ class CellComplex(object):
         cells_k = self.cells[k]
 
         A = sparse.dok_matrix( (len(cells_km1), len(cells_k)), dtype=int )
-        for i in xrange(len(cells_k)):
+        for i in range(len(cells_k)):
             for boundary_cell,coeff in self.boundary_data[cells_k[i]]:
                 j = cells_km1.index(boundary_cell)
                 A[j,i] += coeff
@@ -546,7 +546,7 @@ class CellComplex(object):
         self.ndims = ndims
         self.cells = [None]*(ndims+1)
         self.boundary_data = {}
-        for i in xrange(ndims+1):
+        for i in range(ndims+1):
             self.cells[i] = IndexedSet()
 
 def test_has_solution(fn):

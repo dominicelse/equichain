@@ -67,7 +67,7 @@ class FormalIntegerSum(object):
 
     def __add__(a,b):
         ret = FormalIntegerSum(a.coeffs)
-        for o,coeff in b.coeffs.iteritems():
+        for o,coeff in b.coeffs.items():
             if o in ret.coeffs:
                 ret.coeffs[o] += coeff
             else:
@@ -75,14 +75,14 @@ class FormalIntegerSum(object):
         return ret
 
     def __iter__(self):
-        return self.coeffs.iteritems()
+        return iter(self.coeffs.items())
 
     def itervectors(self):
-        return self.coeffs.iterkeys()
+        return iter(self.coeffs.keys())
 
     def act_with(self,action):
         ret = FormalIntegerSum({})
-        for o,coeff in self.coeffs.iteritems():
+        for o,coeff in self.coeffs.items():
             ret[o.act_with(action)] = coeff
         return ret
 
@@ -91,8 +91,8 @@ class FormalIntegerSum(object):
             return "0"
         else:
             s = ""
-            items = self.coeffs.items()
-            for i in xrange(len(items)):
+            items = list(self.coeffs.items())
+            for i in range(len(items)):
                 s += str(items[i][1]) + "*" + str(items[i][0])
                 if i < len(items)-1:
                     s += " + "
@@ -112,7 +112,7 @@ class MultiIndexer(object):
     def to_index(self, *indices):
         index = 0
         stride = 1
-        for i in xrange(len(indices)):
+        for i in range(len(indices)):
             index += stride*indices[i]
             stride *= self.dims[i]
 
@@ -122,7 +122,7 @@ class MultiIndexer(object):
         assert I >= 0 and I < self.total_dim()
         I0 = I
         ret = numpy.zeros(len(self.dims), dtype=int)
-        for i in xrange(len(self.dims)):
+        for i in range(len(self.dims)):
             ret[i] = I % self.dims[i]
             I = (I - ret[i])//self.dims[i]
         assert self.to_index(*ret) == I0
