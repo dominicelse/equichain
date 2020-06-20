@@ -3,4 +3,5 @@ build/
 cython_fns.c
 *.so
 *_cython.cpp
+sageinit.c
 *.swp

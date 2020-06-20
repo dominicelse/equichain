@@ -20,6 +20,7 @@ import numpy
 from equichain import magmaconv
 from scipy import sparse
 import functools
+import sageinit
 
 try:
     magma('1')
@@ -310,13 +311,7 @@ class NumpyMatrixOverRingGeneric(ScipyOrNumpyMatrixOverRingGeneric):
                 constructor=self._constructor, vector_constructor=self._vector_constructor)
 
     def to_sagedense(self):
-        if patched_sage:
-            nrows,ncols = self.A.shape
-            B = matrix(self.ring, nrows, ncols)
-            B.set_unsafe_from_numpy_int_array(self.A)
-            return SageDenseMatrix(B)
-        else:
-            return SageDenseMatrix(matrix(self.ring, self.A))
+        return SageDenseMatrix(sageinit.sage_matrix_from_numpy_int_array(self.ring, self.A))
 
     def to_numpydense(self):
         return self
